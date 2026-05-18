@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { useMe } from "@/lib/me";
+import { useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/deep-work")({
 });
 
 function DeepWorkPage() {
-  const me = useMe();
+  const session = useSession();
   const qc = useQueryClient();
 
   const { data: sessions } = useQuery({
@@ -45,21 +45,21 @@ function DeepWorkPage() {
 
   return (
     <AppShell title="Deep Work">
-      <NewSessionButton onCreated={() => qc.invalidateQueries({ queryKey: ["deep-work-feed"] })} me={me!} />
+      <NewSessionButton onCreated={() => qc.invalidateQueries({ queryKey: ["deep-work-feed"] })} token={session?.token ?? null} />
 
       <div className="mt-5 space-y-3">
         {sessions?.length === 0 && (
           <p className="text-center text-sm text-muted-foreground">No sessions yet. Be first.</p>
         )}
         {sessions?.map((s) => (
-          <SessionCard key={s.id} session={s} meId={me!} />
+          <SessionCard key={s.id} session={s} token={session?.token ?? null} />
         ))}
       </div>
     </AppShell>
   );
 }
 
-function NewSessionButton({ onCreated, me }: { onCreated: () => void; me: string }) {
+function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: string | null }) {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState("");
   const [minutes, setMinutes] = useState<string>("");
@@ -68,17 +68,17 @@ function NewSessionButton({ onCreated, me }: { onCreated: () => void; me: string
 
   const create = useMutation({
     mutationFn: async () => {
-      const finished = new Date();
-      const started = new Date(finished.getTime() - (Number(minutes) || 0) * 60_000);
-      const { error } = await supabase.from("deep_work").insert({
-        member_id: me,
-        date: toISODate(finished),
-        topic: topic || null,
-        minutes: minutes ? Number(minutes) : null,
-        started_at: started.toISOString(),
-        finished_at: finished.toISOString(),
-        learnings: learnings || null,
-        personal_notes: notes || null,
+      if (!token) throw new Error("Not signed in");
+      const mins = minutes ? Number(minutes) : null;
+      if (mins !== null && (!Number.isFinite(mins) || mins < 1 || mins > 600))
+        throw new Error("Minutes must be 1–600");
+      const { error } = await supabase.rpc("log_deep_work", {
+        _token: token,
+        _date: toISODate(new Date()),
+        _topic: topic || null,
+        _minutes: mins,
+        _learnings: learnings || null,
+        _personal_notes: notes || null,
       });
       if (error) throw error;
     },
@@ -158,7 +158,7 @@ function NewSessionButton({ onCreated, me }: { onCreated: () => void; me: string
   );
 }
 
-function SessionCard({ session, meId }: { session: any; meId: string }) {
+function SessionCard({ session, token }: { session: any; token: string | null }) {
   const qc = useQueryClient();
   const [showComments, setShowComments] = useState(false);
   const { data: comments } = useQuery({
@@ -177,10 +177,11 @@ function SessionCard({ session, meId }: { session: any; meId: string }) {
   const [body, setBody] = useState("");
   const addComment = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("dw_comments").insert({
-        deep_work_id: session.id,
-        author_id: meId,
-        body,
+      if (!token) throw new Error("Not signed in");
+      const { error } = await supabase.rpc("add_dw_comment", {
+        _token: token,
+        _deep_work_id: session.id,
+        _body: body,
       });
       if (error) throw error;
     },

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { useMe } from "@/lib/me";
+import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ type Field = (typeof FIELDS)[number];
 
 function MacrosPage() {
   const me = useMe();
+  const session = useSession();
   const qc = useQueryClient();
   const today = toISODate(new Date());
   const [vals, setVals] = useState<Record<Field, string>>({
@@ -61,9 +62,23 @@ function MacrosPage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const row: any = { member_id: me!, date: today };
-      FIELDS.forEach((f) => (row[f] = vals[f] === "" ? null : Number(vals[f])));
-      const { error } = await supabase.from("macros_logs").upsert(row, { onConflict: "member_id,date" });
+      if (!session) throw new Error("Not signed in");
+      const num = (f: Field) => {
+        if (vals[f] === "") return null;
+        const n = Number(vals[f]);
+        if (!Number.isFinite(n) || n < 0) throw new Error(`Invalid ${f}`);
+        return Math.round(n);
+      };
+      const { error } = await supabase.rpc("log_macros", {
+        _token: session.token,
+        _date: today,
+        _calories: num("calories"),
+        _protein: num("protein"),
+        _carbs: num("carbs"),
+        _fat: num("fat"),
+        _sugar: num("sugar"),
+        _water: num("water"),
+      });
       if (error) throw error;
     },
     onSuccess: () => {
