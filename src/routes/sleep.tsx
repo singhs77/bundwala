@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toISODate } from "@/lib/week";
 import { toast } from "sonner";
+import { withinTimeBuffer } from "@/lib/score";
 
 export const Route = createFileRoute("/sleep")({
   head: () => ({ meta: [{ title: "Sleep — Group Tracker" }] }),
@@ -94,6 +95,13 @@ function SleepPage() {
   });
 
   const hours = hoursBetween(sleepTime, wakeTime);
+  const sleepOk = target?.target_sleep
+    ? withinTimeBuffer(sleepTime, target.target_sleep, 90)
+    : null;
+  const wakeOk = target?.target_wake
+    ? withinTimeBuffer(wakeTime, target.target_wake, 90)
+    : null;
+  const onTarget = sleepOk === true && wakeOk === true;
 
   return (
     <AppShell title="Sleep">
@@ -102,6 +110,9 @@ function SleepPage() {
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Your target</p>
           <p className="mt-1 text-lg font-semibold">
             {target.target_sleep?.slice(0, 5)} → {target.target_wake?.slice(0, 5)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            ±90 min buffer — within the window still scores the point.
           </p>
         </div>
       )}
@@ -122,6 +133,19 @@ function SleepPage() {
           <span className="text-muted-foreground">Hours slept</span>
           <span className="text-lg font-bold tabular-nums">{hours.toFixed(2)}</span>
         </div>
+        {target?.target_sleep && target?.target_wake && (sleepTime || wakeTime) && (
+          <div
+            className={`mt-2 rounded-xl px-3 py-2 text-xs font-medium ${
+              onTarget
+                ? "bg-primary/10 text-primary"
+                : "bg-destructive/10 text-destructive"
+            }`}
+          >
+            {onTarget
+              ? "✓ Within 90-min buffer — point earned"
+              : `Outside buffer — sleep ${sleepOk ? "✓" : "✗"} · wake ${wakeOk ? "✓" : "✗"}`}
+          </div>
+        )}
         <Button className="mt-3 w-full" onClick={() => save.mutate()} disabled={save.isPending}>
           Save
         </Button>

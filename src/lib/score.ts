@@ -25,3 +25,22 @@ export function emptyScores(): CategoryScores {
 export function sumTotal(s: Omit<CategoryScores, "total">): number {
   return Number((s.gym + s.deep_work + s.sleep + s.macros).toFixed(2));
 }
+
+/**
+ * Returns true if `actual` (HH:MM[:SS]) is within `bufferMin` minutes of `target`,
+ * treating both as times-of-day (wraps across midnight).
+ */
+export function withinTimeBuffer(
+  actual: string | null | undefined,
+  target: string | null | undefined,
+  bufferMin = 90,
+): boolean {
+  if (!actual || !target) return false;
+  const toMin = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const diff = Math.abs(toMin(actual) - toMin(target));
+  const wrapped = Math.min(diff, 1440 - diff);
+  return wrapped <= bufferMin;
+}
