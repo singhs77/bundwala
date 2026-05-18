@@ -67,7 +67,7 @@ function Leaderboard() {
       const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets] =
         await Promise.all([
           supabase.from("teams").select("*").order("sort_order"),
-          supabase.from("members").select("*"),
+          supabase.from("members").select("id, name, team_id"),
           supabase.from("scoring_rules").select("*"),
           supabase
             .from("gym_logs")
