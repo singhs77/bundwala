@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Trophy, Skull } from "lucide-react";
@@ -309,14 +309,7 @@ function Leaderboard() {
                         key={m.id}
                         className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums"
                       >
-                        <Link
-                          to="/member/$memberId"
-                          params={{ memberId: m.id }}
-                          search={{ month: ws }}
-                          className="truncate font-medium hover:underline"
-                        >
-                          {m.name}
-                        </Link>
+                        <div className="truncate font-medium">{m.name}</div>
                         <div className="w-9 text-right text-muted-foreground">{s.gym.toFixed(1)}</div>
                         <div className="w-9 text-right text-muted-foreground">{s.deep_work.toFixed(1)}</div>
                         <div className="w-9 text-right text-muted-foreground">{s.sleep.toFixed(1)}</div>
