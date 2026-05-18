@@ -79,7 +79,7 @@ function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: 
         _minutes: mins,
         _learnings: learnings || null,
         _personal_notes: notes || null,
-      });
+      } as never);
       if (error) throw error;
     },
     onSuccess: () => {

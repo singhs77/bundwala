@@ -78,7 +78,7 @@ function MacrosPage() {
         _fat: num("fat"),
         _sugar: num("sugar"),
         _water: num("water"),
-      });
+      } as never);
       if (error) throw error;
     },
     onSuccess: () => {
