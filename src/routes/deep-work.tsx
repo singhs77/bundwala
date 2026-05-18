@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/me";
@@ -16,10 +16,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Send, Clock } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Send, Clock, Trash2 } from "lucide-react";
 import { toISODate } from "@/lib/week";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 export const Route = createFileRoute("/deep-work")({
   head: () => ({ meta: [{ title: "Deep Work — Group Tracker" }] }),
@@ -29,30 +36,97 @@ export const Route = createFileRoute("/deep-work")({
 function DeepWorkPage() {
   const session = useSession();
   const qc = useQueryClient();
+  const [personFilter, setPersonFilter] = useState<string>("all");
 
   const { data: sessions } = useQuery({
-    queryKey: ["deep-work-feed"],
+    queryKey: ["deep-work-feed-all"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("deep_work")
         .select("*, members(name)")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
   });
 
+  const people = useMemo(() => {
+    const map = new Map<string, string>();
+    sessions?.forEach((s: any) => {
+      if (s.member_id && s.members?.name) map.set(s.member_id, s.members.name);
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sessions]);
+
+  const filtered = useMemo(() => {
+    if (!sessions) return [];
+    return personFilter === "all"
+      ? sessions
+      : sessions.filter((s: any) => s.member_id === personFilter);
+  }, [sessions, personFilter]);
+
+  const groups = useMemo(() => {
+    const m = new Map<string, any[]>();
+    for (const s of filtered) {
+      const key = (s.date as string).slice(0, 7); // YYYY-MM
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(s);
+    }
+    return Array.from(m.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filtered]);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["deep-work-feed-all"] });
+    qc.invalidateQueries({ queryKey: ["leaderboard"] });
+  };
+
   return (
     <AppShell title="Deep Work">
-      <NewSessionButton onCreated={() => qc.invalidateQueries({ queryKey: ["deep-work-feed"] })} token={session?.token ?? null} />
+      <NewSessionButton onCreated={invalidate} token={session?.token ?? null} />
 
-      <div className="mt-5 space-y-3">
-        {sessions?.length === 0 && (
-          <p className="text-center text-sm text-muted-foreground">No sessions yet. Be first.</p>
+      <div className="mt-4">
+        <Select value={personFilter} onValueChange={setPersonFilter}>
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by person" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Everyone</SelectItem>
+            {people.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="mt-5 space-y-6">
+        {groups.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground">No sessions yet.</p>
         )}
-        {sessions?.map((s) => (
-          <SessionCard key={s.id} session={s} token={session?.token ?? null} />
+        {groups.map(([month, items]) => (
+          <section key={month}>
+            <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {format(parseISO(`${month}-01`), "MMMM yyyy")}
+              <span className="ml-2 font-normal normal-case text-muted-foreground/70">
+                {items.length} {items.length === 1 ? "session" : "sessions"}
+              </span>
+            </h2>
+            <div className="space-y-3">
+              {items.map((s) => (
+                <SessionCard
+                  key={s.id}
+                  session={s}
+                  token={session?.token ?? null}
+                  memberId={session?.memberId ?? null}
+                  onChanged={invalidate}
+                />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </AppShell>
@@ -158,7 +232,17 @@ function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: 
   );
 }
 
-function SessionCard({ session, token }: { session: any; token: string | null }) {
+function SessionCard({
+  session,
+  token,
+  memberId,
+  onChanged,
+}: {
+  session: any;
+  token: string | null;
+  memberId: string | null;
+  onChanged: () => void;
+}) {
   const qc = useQueryClient();
   const [showComments, setShowComments] = useState(false);
   const { data: comments } = useQuery({
@@ -191,20 +275,55 @@ function SessionCard({ session, token }: { session: any; token: string | null })
     },
   });
 
+  const del = useMutation({
+    mutationFn: async () => {
+      if (!token) throw new Error("Not signed in");
+      const { error } = await supabase.rpc("delete_deep_work", {
+        _token: token,
+        _id: session.id,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Session deleted");
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const isOwn = memberId && session.member_id === memberId;
+
   return (
     <article className="rounded-2xl border border-border bg-card p-4">
       <header className="mb-2 flex items-baseline justify-between gap-2">
         <div>
           <div className="font-semibold">{session.members?.name}</div>
           <div className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}
+            {format(parseISO(session.date), "EEE, MMM d, yyyy")}
           </div>
         </div>
-        {session.minutes ? (
-          <div className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">
-            <Clock className="h-3 w-3" /> {session.minutes}m
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {session.minutes ? (
+            <div className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">
+              <Clock className="h-3 w-3" /> {session.minutes}m
+            </div>
+          ) : null}
+          {isOwn && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              disabled={del.isPending}
+              onClick={() => {
+                if (confirm("Delete this session? Your standings will update.")) {
+                  del.mutate();
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </header>
       {session.topic && <p className="font-medium">{session.topic}</p>}
       {session.learnings && (
