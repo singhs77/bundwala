@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { setStoredMemberId, useMe } from "@/lib/me";
 import { Button } from "@/components/ui/button";
@@ -270,6 +270,7 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
 export function CurrentMemberBadge() {
   const me = useMe();
   const { data: members } = useMembersQuery();
+  const qc = useQueryClient();
   const current = members?.find((m) => m.id === me) as Member | undefined;
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<Member | null>(null);
@@ -333,7 +334,7 @@ export function CurrentMemberBadge() {
       member={current}
       open={renaming}
       onOpenChange={setRenaming}
-      onRenamed={() => { /* react-query will refetch on next mount; trigger immediately */ }}
+      onRenamed={() => qc.invalidateQueries({ queryKey: ["members"] })}
     />
     </>
   );
