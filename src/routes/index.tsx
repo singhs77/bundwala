@@ -11,6 +11,8 @@ import {
   shiftMonth,
   startOfMonth,
   toISODate,
+  saturdaysInMonth,
+  addDays,
 } from "@/lib/week";
 import { applyCap, sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
@@ -118,6 +120,7 @@ function Leaderboard() {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
     const month = daysOfMonth(anchor).map(toISODate);
     const result = new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
+    const monthSaturdays = saturdaysInMonth(anchor);
     for (const m of data.members) {
       const gymCount = data.gym.filter(
         (g) => g.member_id === m.id && (g.status === "yes" || g.status === "home"),
@@ -138,16 +141,26 @@ function Leaderboard() {
         }
         return Number(s.hours ?? 0) >= 7;
       }).length;
-      const macrosCount = data.macros.filter(
-        (x) => x.member_id === m.id && x.calories !== null,
-      ).length;
+      // Macros: 1.25 pts per Sat→Fri week fully logged (calories on all 7 days), capped at 5
+      const macrosDates = new Set(
+        data.macros
+          .filter((x) => x.member_id === m.id && x.calories !== null)
+          .map((x) => x.date),
+      );
+      let macrosPts = 0;
+      for (const sat of monthSaturdays) {
+        const weekDates = Array.from({ length: 7 }, (_, i) => toISODate(addDays(sat, i)));
+        if (weekDates.every((d) => macrosDates.has(d))) macrosPts += 1.25;
+      }
+      macrosPts = Math.min(macrosPts, 5);
       const scaleRule = (r?: Rule): Rule | undefined =>
         r ? { ...r, weekly_cap: Number(r.weekly_cap) * capScale } : r;
       const cat = {
-        gym: applyCap(gymCount, scaleRule(ruleMap.get("gym"))),
+        // Gym: 0.25 pts per qualifying day, capped at 5 (20 days = 5 pts)
+        gym: Math.min(gymCount * 0.25, 5),
         deep_work: applyCap(dwCount, scaleRule(ruleMap.get("deep_work"))),
         sleep: applyCap(sleepCount, scaleRule(ruleMap.get("sleep"))),
-        macros: applyCap(macrosCount, scaleRule(ruleMap.get("macros"))),
+        macros: macrosPts,
         total: 0,
       };
       const baseline = data.baselines.find((b: any) => b.member_id === m.id);
