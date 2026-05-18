@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Check, X, Home } from "lucide-react";
 import { toISODate } from "@/lib/week";
 import { toast } from "sonner";
+import { useState } from "react";
 
 export const Route = createFileRoute("/gym")({
   head: () => ({ meta: [{ title: "Gym — Group Tracker" }] }),
@@ -36,6 +37,8 @@ function GymPage() {
   const qc = useQueryClient();
   const today = toISODate(new Date());
   const days = lastNDays(14);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const pickerDays = lastNDays(3).slice().reverse(); // today, yesterday, 2 days ago
 
   const { data: logs } = useQuery({
     queryKey: ["gym-logs", me, days[0], days[days.length - 1]],
@@ -70,21 +73,47 @@ function GymPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const todayLog = logs?.find((l) => l.date === today);
+  const selectedLog = logs?.find((l) => l.date === selectedDate);
+
+  const dateLabel = (d: string) => {
+    if (d === today) return "Today";
+    const t = new Date(today + "T00:00:00");
+    const diff = Math.round((t.getTime() - new Date(d + "T00:00:00").getTime()) / 86400000);
+    if (diff === 1) return "Yesterday";
+    return `${diff} days ago`;
+  };
 
   return (
     <AppShell title="Gym">
       <section className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-sm font-medium text-muted-foreground">Today</h2>
+        <h2 className="text-sm font-medium text-muted-foreground">Log a workout</h2>
         <p className="mt-0.5 text-2xl font-bold">Did you train?</p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {pickerDays.map((d) => {
+            const active = d === selectedDate;
+            return (
+              <button
+                key={d}
+                onClick={() => setSelectedDate(d)}
+                className={`rounded-xl py-2 text-xs font-semibold transition ${
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                {dateLabel(d)}
+              </button>
+            );
+          })}
+        </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
           {statuses.map((s) => {
             const Icon = s.icon;
-            const active = todayLog?.status === s.value;
+            const active = selectedLog?.status === s.value;
             return (
               <button
                 key={s.value}
-                onClick={() => setStatus.mutate({ date: today, status: s.value })}
+                onClick={() => setStatus.mutate({ date: selectedDate, status: s.value })}
                 disabled={setStatus.isPending}
                 className={`flex flex-col items-center justify-center gap-1 rounded-xl py-4 text-sm font-semibold transition ${
                   active ? s.tone : "bg-secondary text-secondary-foreground hover:bg-accent"
