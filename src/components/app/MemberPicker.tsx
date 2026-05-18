@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { setStoredMemberId, useMe } from "@/lib/me";
+import { setSession, useMe, useSession, clearSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, UserCircle2, Lock, Pencil } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, UserCircle2, Lock, Pencil, LogOut, Upload } from "lucide-react";
+import { useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +15,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { sha256 } from "@/lib/hash";
 import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+type Member = {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  team_id: string | null;
+  has_password: boolean | null;
+};
 
 export function useMembersQuery() {
   return useQuery({
@@ -24,7 +32,7 @@ export function useMembersQuery() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("members")
-        .select("*, teams(*)")
+        .select("id, name, avatar_url, team_id, has_password, teams(*)")
         .order("name");
       if (error) throw error;
       return data ?? [];
@@ -32,11 +40,30 @@ export function useMembersQuery() {
   });
 }
 
-type Member = {
-  id: string;
-  name: string;
-  password_hash: string | null;
-};
+export function initialsOf(name: string | null | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+}
+
+export function MemberAvatar({
+  name,
+  url,
+  className = "h-8 w-8",
+}: {
+  name: string | null | undefined;
+  url: string | null | undefined;
+  className?: string;
+}) {
+  return (
+    <Avatar className={className}>
+      {url && <AvatarImage src={url} alt={name ?? ""} />}
+      <AvatarFallback className="bg-secondary text-xs font-semibold uppercase">
+        {initialsOf(name)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 function PasswordPrompt({
   member,
@@ -45,9 +72,9 @@ function PasswordPrompt({
 }: {
   member: Member | null;
   onClose: () => void;
-  onAuthed: (id: string) => void;
+  onAuthed: (id: string, token: string) => void;
 }) {
-  const isSetup = !!member && !member.password_hash;
+  const isSetup = !!member && !member.has_password;
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,30 +88,37 @@ function PasswordPrompt({
   const submit = async () => {
     if (!member) return;
     if (!pw) return toast.error("Enter a password");
+    if (pw.length < 4) return toast.error("At least 4 characters");
     setBusy(true);
     try {
-      const hash = await sha256(pw);
+      let token: string | null = null;
       if (isSetup) {
         if (pw !== confirm) {
           setBusy(false);
           return toast.error("Passwords don't match");
         }
-        const { error } = await supabase
-          .from("members")
-          .update({ password_hash: hash })
-          .eq("id", member.id);
+        const { data, error } = await supabase.rpc("member_set_password", {
+          _member_id: member.id,
+          _current_password: "",
+          _new_password: pw,
+        });
         if (error) throw error;
+        token = data as unknown as string;
         toast.success("Password set");
       } else {
-        if (hash !== member.password_hash) {
-          setBusy(false);
-          return toast.error("Wrong password");
-        }
+        const { data, error } = await supabase.rpc("member_verify_password", {
+          _member_id: member.id,
+          _password: pw,
+        });
+        if (error) throw error;
+        token = data as unknown as string;
       }
-      onAuthed(member.id);
+      if (!token) throw new Error("No session token returned");
+      onAuthed(member.id, token);
       reset();
     } catch (e: any) {
-      toast.error(e.message);
+      const msg = String(e.message || e);
+      toast.error(msg.includes("wrong_password") ? "Wrong password" : msg);
       setBusy(false);
     }
   };
@@ -138,44 +172,70 @@ function PasswordPrompt({
 }
 
 function RenameDialog({
-  member,
   open,
   onOpenChange,
   onRenamed,
 }: {
-  member: Member | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onRenamed: () => void;
 }) {
+  const session = useSession();
+  const me = useMe();
+  const { data: members } = useMembersQuery();
+  const current = members?.find((m) => m.id === me) as Member | undefined;
   const [name, setName] = useState("");
-  const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const submit = async () => {
-    if (!member) return;
-    if (!name.trim()) return toast.error("Enter a name");
+    if (!session) return;
+    const trimmed = name.trim();
+    if (!trimmed) return toast.error("Enter a name");
+    if (trimmed.length > 60) return toast.error("Name too long");
     setBusy(true);
     try {
-      if (member.password_hash) {
-        const h = await sha256(pw);
-        if (h !== member.password_hash) {
-          setBusy(false);
-          return toast.error("Wrong password");
-        }
-      }
-      const { error } = await supabase
-        .from("members")
-        .update({ name: name.trim() })
-        .eq("id", member.id);
+      const { error } = await supabase.rpc("member_rename", {
+        _token: session.token,
+        _new_name: trimmed,
+      });
       if (error) throw error;
       toast.success("Name updated");
-      setName(""); setPw(""); setBusy(false);
+      setName("");
+      setBusy(false);
       onRenamed();
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(String(e.message || e));
       setBusy(false);
+    }
+  };
+
+  const uploadAvatar = async (file: File) => {
+    if (!session || !current) return;
+    if (file.size > 5 * 1024 * 1024) return toast.error("Image must be under 5 MB");
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${current.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+        contentType: file.type,
+        upsert: true,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { error: rpcErr } = await supabase.rpc("member_set_avatar", {
+        _token: session.token,
+        _url: pub.publicUrl,
+      });
+      if (rpcErr) throw rpcErr;
+      toast.success("Avatar updated");
+      onRenamed();
+    } catch (e: any) {
+      toast.error(String(e.message || e));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -183,36 +243,54 @@ function RenameDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Change your name</DialogTitle>
-          <DialogDescription>
-            {member?.password_hash ? "Confirm with your password." : "Pick a new name."}
-          </DialogDescription>
+          <DialogTitle>Profile</DialogTitle>
+          <DialogDescription>Change your name or avatar.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <MemberAvatar
+              name={current?.name}
+              url={current?.avatar_url}
+              className="h-16 w-16"
+            />
+            <div className="flex-1">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadAvatar(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {uploading ? "Uploading…" : "Upload photo"}
+              </Button>
+            </div>
+          </div>
           <div>
             <Label htmlFor="new-name">New name</Label>
             <Input
               id="new-name"
               autoFocus
               value={name}
-              placeholder={member?.name}
+              placeholder={current?.name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          {member?.password_hash && (
-            <div>
-              <Label htmlFor="cur-pw">Password</Label>
-              <Input
-                id="cur-pw"
-                type="password"
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-              />
-            </div>
-          )}
         </div>
         <DialogFooter>
-          <Button onClick={submit} disabled={busy} className="w-full">Save</Button>
+          <Button onClick={submit} disabled={busy || !name.trim()} className="w-full">
+            Save name
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -220,7 +298,7 @@ function RenameDialog({
 }
 
 export function MemberGate({ children }: { children: React.ReactNode }) {
-  const me = useMe();
+  const session = useSession();
   const { data: members, isLoading } = useMembersQuery();
   const [pending, setPending] = useState<Member | null>(null);
 
@@ -231,7 +309,7 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!me) {
+  if (!session) {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6">
         <div className="text-center">
@@ -241,25 +319,29 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
           </p>
         </div>
         <div className="grid w-full max-w-sm grid-cols-2 gap-2">
-          {members?.map((m) => (
-            <Button
-              key={m.id}
-              variant="secondary"
-              className="h-12 justify-start"
-              onClick={() => setPending(m as Member)}
-            >
-              <UserCircle2 className="mr-2 h-5 w-5" />
-              <span className="flex-1 text-left">{m.name}</span>
-              {(m as Member).password_hash && (
-                <Lock className="ml-1 h-3.5 w-3.5 opacity-60" />
-              )}
-            </Button>
-          ))}
+          {members?.map((m) => {
+            const mem = m as unknown as Member;
+            return (
+              <Button
+                key={mem.id}
+                variant="secondary"
+                className="h-12 justify-start"
+                onClick={() => setPending(mem)}
+              >
+                <MemberAvatar name={mem.name} url={mem.avatar_url} className="mr-2 h-6 w-6" />
+                <span className="flex-1 truncate text-left">{mem.name}</span>
+                {mem.has_password && <Lock className="ml-1 h-3.5 w-3.5 opacity-60" />}
+              </Button>
+            );
+          })}
         </div>
         <PasswordPrompt
           member={pending}
           onClose={() => setPending(null)}
-          onAuthed={(id) => { setStoredMemberId(id); setPending(null); }}
+          onAuthed={(id, token) => {
+            setSession({ memberId: id, token });
+            setPending(null);
+          }}
         />
       </div>
     );
@@ -268,74 +350,99 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
 }
 
 export function CurrentMemberBadge() {
-  const me = useMe();
+  const session = useSession();
+  const me = session?.memberId ?? null;
   const { data: members } = useMembersQuery();
   const qc = useQueryClient();
   const current = members?.find((m) => m.id === me) as Member | undefined;
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<Member | null>(null);
   const [renaming, setRenaming] = useState(false);
+
   if (!current) return null;
+
+  const signOut = async () => {
+    try {
+      if (session) {
+        await supabase.rpc("member_logout", { _token: session.token });
+      }
+    } catch {
+      // ignore — clearing local session anyway
+    }
+    clearSession();
+    setOpen(false);
+  };
+
   return (
     <>
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-sm font-medium">
-          <UserCircle2 className="h-4 w-4" />
-          {current.name}
-          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-        </button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Switch user</DialogTitle>
-          <DialogDescription>Locked profiles need a password.</DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-2">
-          {members?.map((m) => (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <button className="flex items-center gap-1.5 rounded-full bg-secondary py-1 pl-1 pr-2 text-sm font-medium">
+            <MemberAvatar name={current.name} url={current.avatar_url} className="h-6 w-6" />
+            {current.name}
+            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          </button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Switch user</DialogTitle>
+            <DialogDescription>Locked profiles need a password.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2">
+            {members?.map((m) => {
+              const mem = m as unknown as Member;
+              return (
+                <Button
+                  key={mem.id}
+                  variant={mem.id === me ? "default" : "secondary"}
+                  className="h-11 justify-start"
+                  onClick={() => {
+                    if (mem.id === me) {
+                      setOpen(false);
+                      return;
+                    }
+                    setPending(mem);
+                    setOpen(false);
+                  }}
+                >
+                  <MemberAvatar name={mem.name} url={mem.avatar_url} className="mr-2 h-5 w-5" />
+                  <span className="flex-1 truncate text-left">{mem.name}</span>
+                  {mem.has_password && <Lock className="ml-1 h-3.5 w-3.5 opacity-60" />}
+                </Button>
+              );
+            })}
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
             <Button
-              key={m.id}
-              variant={m.id === me ? "default" : "secondary"}
-              className="h-11 justify-start"
+              variant="outline"
+              className="w-full"
               onClick={() => {
-                if (m.id === me) { setOpen(false); return; }
-                const mem = m as Member;
-                if (mem.password_hash) {
-                  setPending(mem);
-                  setOpen(false);
-                } else {
-                  setPending(mem);
-                  setOpen(false);
-                }
+                setOpen(false);
+                setRenaming(true);
               }}
             >
-              <span className="flex-1 text-left">{m.name}</span>
-              {(m as Member).password_hash && <Lock className="ml-1 h-3.5 w-3.5 opacity-60" />}
+              <Pencil className="mr-2 h-4 w-4" /> Edit profile
             </Button>
-          ))}
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => { setOpen(false); setRenaming(true); }}
-          >
-            <Pencil className="mr-2 h-4 w-4" /> Change my name
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    <PasswordPrompt
-      member={pending}
-      onClose={() => setPending(null)}
-      onAuthed={(id) => { setStoredMemberId(id); setPending(null); }}
-    />
-    <RenameDialog
-      member={current}
-      open={renaming}
-      onOpenChange={setRenaming}
-      onRenamed={() => qc.invalidateQueries({ queryKey: ["members"] })}
-    />
+            <Button variant="ghost" className="w-full" onClick={signOut}>
+              <LogOut className="mr-2 h-4 w-4" /> Sign out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <PasswordPrompt
+        member={pending}
+        onClose={() => setPending(null)}
+        onAuthed={(id, token) => {
+          setSession({ memberId: id, token });
+          setPending(null);
+          qc.invalidateQueries();
+        }}
+      />
+      <RenameDialog
+        open={renaming}
+        onOpenChange={setRenaming}
+        onRenamed={() => qc.invalidateQueries({ queryKey: ["members"] })}
+      />
     </>
   );
 }
