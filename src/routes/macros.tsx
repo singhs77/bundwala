@@ -23,26 +23,26 @@ function MacrosPage() {
   const session = useSession();
   const qc = useQueryClient();
   const today = toISODate(new Date());
+  const yesterday = toISODate(new Date(Date.now() - 86400000));
+  const [selectedDate, setSelectedDate] = useState<string>(today);
   const [vals, setVals] = useState<Record<Field, string>>({
     calories: "", protein: "", carbs: "", fat: "", sugar: "", water: "",
   });
 
-  const { data: todayLog } = useQuery({
-    queryKey: ["macros-today", me, today],
+  const { data: dayLog } = useQuery({
+    queryKey: ["macros-today", me, selectedDate],
     queryFn: async () => {
-      const { data } = await supabase.from("macros_logs").select("*").eq("member_id", me!).eq("date", today).maybeSingle();
+      const { data } = await supabase.from("macros_logs").select("*").eq("member_id", me!).eq("date", selectedDate).maybeSingle();
       return data;
     },
     enabled: !!me,
   });
 
   useEffect(() => {
-    if (todayLog) {
-      const next: any = {};
-      FIELDS.forEach((f) => (next[f] = todayLog[f] != null ? String(todayLog[f]) : ""));
-      setVals(next);
-    }
-  }, [todayLog]);
+    const next: any = {};
+    FIELDS.forEach((f) => (next[f] = dayLog && (dayLog as any)[f] != null ? String((dayLog as any)[f]) : ""));
+    setVals(next);
+  }, [dayLog, selectedDate]);
 
   const ws = toISODate(startOfWeek(new Date()));
   const we = toISODate(endOfWeek(new Date()));
@@ -71,7 +71,7 @@ function MacrosPage() {
       };
       const { error } = await supabase.rpc("log_macros", {
         _token: session.token,
-        _date: today,
+        _date: selectedDate,
         _calories: num("calories"),
         _protein: num("protein"),
         _carbs: num("carbs"),
@@ -99,7 +99,25 @@ function MacrosPage() {
   return (
     <AppShell title="Macros">
       <section className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="font-semibold">Log today</h2>
+        <h2 className="font-semibold">Log macros</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {[
+            { d: today, label: "Today" },
+            { d: yesterday, label: "Yesterday" },
+          ].map((o) => (
+            <button
+              key={o.d}
+              onClick={() => setSelectedDate(o.d)}
+              className={`rounded-xl py-2 text-xs font-semibold transition ${
+                selectedDate === o.d
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {FIELDS.map((f) => (
             <div key={f}>

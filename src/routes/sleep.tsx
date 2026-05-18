@@ -30,6 +30,8 @@ function SleepPage() {
   const session = useSession();
   const qc = useQueryClient();
   const today = toISODate(new Date());
+  const yesterday = toISODate(new Date(Date.now() - 86400000));
+  const [selectedDate, setSelectedDate] = useState(today);
   const [sleepTime, setSleepTime] = useState("");
   const [wakeTime, setWakeTime] = useState("");
 
@@ -43,20 +45,18 @@ function SleepPage() {
   });
 
   const { data: today_log } = useQuery({
-    queryKey: ["sleep-today", me, today],
+    queryKey: ["sleep-today", me, selectedDate],
     queryFn: async () => {
-      const { data } = await supabase.from("sleep_logs").select("*").eq("member_id", me!).eq("date", today).maybeSingle();
+      const { data } = await supabase.from("sleep_logs").select("*").eq("member_id", me!).eq("date", selectedDate).maybeSingle();
       return data;
     },
     enabled: !!me,
   });
 
   useEffect(() => {
-    if (today_log) {
-      setSleepTime(today_log.sleep_time?.slice(0, 5) ?? "");
-      setWakeTime(today_log.wake_time?.slice(0, 5) ?? "");
-    }
-  }, [today_log]);
+    setSleepTime(today_log?.sleep_time?.slice(0, 5) ?? "");
+    setWakeTime(today_log?.wake_time?.slice(0, 5) ?? "");
+  }, [today_log, selectedDate]);
 
   const { data: recent } = useQuery({
     queryKey: ["sleep-recent", me],
@@ -78,7 +78,7 @@ function SleepPage() {
       const hours = hoursBetween(sleepTime, wakeTime);
       const { error } = await supabase.rpc("log_sleep", {
         _token: session.token,
-        _date: today,
+        _date: selectedDate,
         _sleep_time: (sleepTime || null) as any,
         _wake_time: (wakeTime || null) as any,
         _hours: hours,
@@ -118,7 +118,25 @@ function SleepPage() {
       )}
 
       <section className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="font-semibold">Log today</h2>
+        <h2 className="font-semibold">Log sleep</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {[
+            { d: today, label: "Today" },
+            { d: yesterday, label: "Yesterday" },
+          ].map((o) => (
+            <button
+              key={o.d}
+              onClick={() => setSelectedDate(o.d)}
+              className={`rounded-xl py-2 text-xs font-semibold transition ${
+                selectedDate === o.d
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
             <Label htmlFor="s">Sleep time</Label>
