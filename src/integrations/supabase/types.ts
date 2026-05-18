@@ -14,7 +14,330 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      deep_work: {
+        Row: {
+          created_at: string
+          date: string
+          finished_at: string | null
+          id: string
+          learnings: string | null
+          member_id: string
+          minutes: number | null
+          personal_notes: string | null
+          started_at: string | null
+          topic: string | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          finished_at?: string | null
+          id?: string
+          learnings?: string | null
+          member_id: string
+          minutes?: number | null
+          personal_notes?: string | null
+          started_at?: string | null
+          topic?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          finished_at?: string | null
+          id?: string
+          learnings?: string | null
+          member_id?: string
+          minutes?: number | null
+          personal_notes?: string | null
+          started_at?: string | null
+          topic?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deep_work_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dw_comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          deep_work_id: string
+          id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          deep_work_id: string
+          id?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          deep_work_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dw_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dw_comments_deep_work_id_fkey"
+            columns: ["deep_work_id"]
+            isOneToOne: false
+            referencedRelation: "deep_work"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      free_days: {
+        Row: {
+          date: string
+          label: string | null
+        }
+        Insert: {
+          date: string
+          label?: string | null
+        }
+        Update: {
+          date?: string
+          label?: string | null
+        }
+        Relationships: []
+      }
+      gym_logs: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          member_id: string
+          status: Database["public"]["Enums"]["gym_status"]
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          member_id: string
+          status: Database["public"]["Enums"]["gym_status"]
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          member_id?: string
+          status?: Database["public"]["Enums"]["gym_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_logs_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      macros_logs: {
+        Row: {
+          calories: number | null
+          carbs: number | null
+          created_at: string
+          date: string
+          fat: number | null
+          id: string
+          member_id: string
+          protein: number | null
+          sugar: number | null
+          water: number | null
+        }
+        Insert: {
+          calories?: number | null
+          carbs?: number | null
+          created_at?: string
+          date: string
+          fat?: number | null
+          id?: string
+          member_id: string
+          protein?: number | null
+          sugar?: number | null
+          water?: number | null
+        }
+        Update: {
+          calories?: number | null
+          carbs?: number | null
+          created_at?: string
+          date?: string
+          fat?: number | null
+          id?: string
+          member_id?: string
+          protein?: number | null
+          sugar?: number | null
+          water?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "macros_logs_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      members: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          name: string
+          team_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          team_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scoring_rules: {
+        Row: {
+          category: string
+          points_per_entry: number
+          weekly_cap: number
+        }
+        Insert: {
+          category: string
+          points_per_entry?: number
+          weekly_cap?: number
+        }
+        Update: {
+          category?: string
+          points_per_entry?: number
+          weekly_cap?: number
+        }
+        Relationships: []
+      }
+      sleep_logs: {
+        Row: {
+          created_at: string
+          date: string
+          free_day: boolean
+          hours: number | null
+          id: string
+          member_id: string
+          sleep_time: string | null
+          wake_time: string | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          free_day?: boolean
+          hours?: number | null
+          id?: string
+          member_id: string
+          sleep_time?: string | null
+          wake_time?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          free_day?: boolean
+          hours?: number | null
+          id?: string
+          member_id?: string
+          sleep_time?: string | null
+          wake_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_logs_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sleep_targets: {
+        Row: {
+          member_id: string
+          target_sleep: string | null
+          target_wake: string | null
+        }
+        Insert: {
+          member_id: string
+          target_sleep?: string | null
+          target_wake?: string | null
+        }
+        Update: {
+          member_id?: string
+          target_sleep?: string | null
+          target_wake?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_targets_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +346,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      gym_status: "yes" | "no" | "home"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +473,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      gym_status: ["yes", "no", "home"],
+    },
   },
 } as const
