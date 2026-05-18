@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/week";
 import { applyCap, sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Collapsible,
   CollapsibleContent,
@@ -32,6 +33,30 @@ function Leaderboard() {
   const ws = useMemo(() => toISODate(startOfWeek(anchor)), [anchor]);
   const we = useMemo(() => toISODate(endOfWeek(anchor)), [anchor]);
   const [openTeams, setOpenTeams] = useState<Record<string, boolean>>({});
+  const qc = useQueryClient();
+
+  // Realtime: refresh standings whenever any activity changes
+  useEffect(() => {
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["leaderboard"] });
+      }, 400);
+    };
+    const channel = supabase
+      .channel("standings-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "gym_logs" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sleep_logs" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "macros_logs" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "deep_work" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "free_days" }, refresh)
+      .subscribe();
+    return () => {
+      if (pending) clearTimeout(pending);
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", ws, we],
