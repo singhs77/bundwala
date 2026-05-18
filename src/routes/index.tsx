@@ -190,9 +190,13 @@ function Leaderboard() {
 
   const dogshit = useMemo(() => {
     if (!data) return null;
+    const freeAgentTeamIds = new Set(
+      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
+    );
     let worst: { name: string; total: number } | null = null;
     for (const m of data.members) {
       if (!m.team_id) continue;
+      if (freeAgentTeamIds.has(m.team_id)) continue;
       const s = scores.get(m.id);
       if (!s) continue;
       if (!worst || s.total < worst.total) worst = { name: m.name, total: s.total };
