@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { useMe } from "@/lib/me";
+import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Check, X, Home } from "lucide-react";
 import { toISODate } from "@/lib/week";
@@ -32,6 +32,7 @@ function lastNDays(n: number): string[] {
 
 function GymPage() {
   const me = useMe();
+  const session = useSession();
   const qc = useQueryClient();
   const today = toISODate(new Date());
   const days = lastNDays(14);
@@ -53,9 +54,12 @@ function GymPage() {
 
   const setStatus = useMutation({
     mutationFn: async ({ date, status }: { date: string; status: "yes" | "no" | "home" }) => {
-      const { error } = await supabase
-        .from("gym_logs")
-        .upsert({ member_id: me!, date, status }, { onConflict: "member_id,date" });
+      if (!session) throw new Error("Not signed in");
+      const { error } = await supabase.rpc("log_gym", {
+        _token: session.token,
+        _date: date,
+        _status: status,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
