@@ -475,6 +475,10 @@ export type Database = {
         }
         Returns: string
       }
+      member_set_team: {
+        Args: { _team_id: string; _token: string }
+        Returns: undefined
+      }
       member_verify_password: {
         Args: { _member_id: string; _password: string }
         Returns: string
