@@ -78,8 +78,8 @@ function SleepPage() {
       const { error } = await supabase.rpc("log_sleep", {
         _token: session.token,
         _date: today,
-        _sleep_time: sleepTime || null,
-        _wake_time: wakeTime || null,
+        _sleep_time: (sleepTime || null) as any,
+        _wake_time: (wakeTime || null) as any,
         _hours: hours,
       });
       if (error) throw error;
