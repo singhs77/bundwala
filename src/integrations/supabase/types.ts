@@ -200,6 +200,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          password_hash: string | null
           team_id: string | null
         }
         Insert: {
@@ -207,6 +208,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          password_hash?: string | null
           team_id?: string | null
         }
         Update: {
@@ -214,6 +216,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          password_hash?: string | null
           team_id?: string | null
         }
         Relationships: [
