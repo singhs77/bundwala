@@ -64,7 +64,7 @@ function Leaderboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", ws, we],
     queryFn: async () => {
-      const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets] =
+      const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets, baselines] =
         await Promise.all([
           supabase.from("teams").select("*").order("sort_order"),
           supabase.from("members").select("id, name, team_id"),
@@ -91,6 +91,7 @@ function Leaderboard() {
             .lte("date", we),
           supabase.from("free_days").select("date").gte("date", ws).lte("date", we),
           supabase.from("sleep_targets").select("*"),
+          supabase.from("baseline_scores").select("member_id,gym,macros,deep_work,sleep"),
         ]);
       return {
         teams: teams.data ?? [],
@@ -102,6 +103,7 @@ function Leaderboard() {
         macros: macros.data ?? [],
         freeDays: (freeDays.data ?? []).map((f) => f.date),
         targets: targets.data ?? [],
+        baselines: baselines.data ?? [],
       };
     },
   });
@@ -148,6 +150,13 @@ function Leaderboard() {
         macros: applyCap(macrosCount, scaleRule(ruleMap.get("macros"))),
         total: 0,
       };
+      const baseline = data.baselines.find((b: any) => b.member_id === m.id);
+      if (baseline) {
+        cat.gym = Number(cat.gym) + Number(baseline.gym ?? 0);
+        cat.deep_work = Number(cat.deep_work) + Number(baseline.deep_work ?? 0);
+        cat.sleep = Number(cat.sleep) + Number(baseline.sleep ?? 0);
+        cat.macros = Number(cat.macros) + Number(baseline.macros ?? 0);
+      }
       cat.total = sumTotal(cat);
       result.set(m.id, cat);
     }
