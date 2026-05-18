@@ -63,3 +63,14 @@ export function shiftMonth(d: Date, delta: number): Date {
 export function formatMonth(d: Date): string {
   return d.toLocaleString(undefined, { month: "long", year: "numeric" });
 }
+
+export function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+/** Saturdays whose date falls within the given month. */
+export function saturdaysInMonth(anchor: Date): Date[] {
+  return daysOfMonth(anchor).filter((d) => d.getDay() === 6);
+}

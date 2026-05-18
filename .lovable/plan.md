@@ -1,42 +1,49 @@
 ## Goal
-Wipe all activity logs and seed per-member baseline scores from the screenshot so the standings start at those exact numbers.
+Update the monthly scoring math on the Standings page for **gym** and **macros**. No schema changes, no other categories touched.
 
-## 1. New table: `baseline_scores`
-Schema migration:
-- `member_id uuid PRIMARY KEY` (one row per member)
-- `gym numeric NOT NULL DEFAULT 0`
-- `macros numeric NOT NULL DEFAULT 0`
-- `deep_work numeric NOT NULL DEFAULT 0`
-- `sleep numeric NOT NULL DEFAULT 0`
-- RLS: public read; no write policies (seeded server-side via insert tool).
+## New rules
 
-## 2. Seed baselines (from screenshot)
-Insert one row per member:
+**Gym** — linear 0.25 pts per qualifying day, capped at 5 pts/month
+- Qualifying day = `gym_logs.status` is `yes` or `home` (unchanged)
+- 20 days → 5 pts. Below 20 = `days × 0.25`.
 
-| Member | Gym | Macros | DW | Sleep |
-|---|---|---|---|---|
-| Chic Boy GL | 0 | 0 | 2.6 | 2.6 |
-| Milan | 0 | 0 | 0.4 | 2.8 |
-| Saju Thou | 0 | 0 | 0.2 | 1.8 |
-| Twin GL | 0 | 0 | 2.4 | 2.6 |
-| Dr GL | 0 | 0 | 1.6 | 2.2 |
-| Kazekage | 0 | 0 | 0.4 | 1.2 |
-| Shaad Paji | 0 | 0 | 0.6 | 3 |
-| Chic Mun | 0 | 0 | 1.4 | 1.6 |
-| Arneet | 0 | 0 | 1.4 | 2.4 |
-| Baby GL | 0 | 0 | 2.2 | 1.2 |
-| Zoro Twin | 0 | 0 | 0.4 | 1.8 |
-| Trolla Singh | 0 | 0 | 0.6 | 1.2 |
-| Dillski | 0 | 0 | 0.4 | 0.4 |
+**Macros** — 1.25 pts per fully-logged week (Sat→Fri), capped at 5 pts/month
+- A week earns 1.25 only if there are macros entries with non-null `calories` on **all 7 days** of that Sat→Fri week.
+- Only weeks whose Saturday falls within the displayed month count (so partial overlap weeks at month edges don't earn — keeps it deterministic). I'll surface this in code comments; if you'd rather count weeks that *overlap* the month, say so and I'll switch.
 
-## 3. Clear all log tables
-`DELETE FROM dw_comments; DELETE FROM gym_logs; DELETE FROM sleep_logs; DELETE FROM deep_work; DELETE FROM macros_logs;`
+## Implementation (single file)
 
-## 4. Frontend changes (`src/routes/index.tsx`)
-- Fetch `baseline_scores` alongside the rest of the leaderboard data.
-- In the `scores` memo, add baseline values onto each category AFTER `applyCap`, then recompute `total`. This way baselines are a flat starting offset and live logs add on top, uncapped by the baseline portion.
-- Keep `teamTotals` / `leaderTeamId` logic unchanged — they read from `scores`.
+Edit `src/routes/index.tsx` `scores` memo:
 
-## Notes
-- Free-agent "Dillski" baseline is included but won't roll into any team total (no `team_id`), matching the screenshot.
-- Future edits to baselines can be done by re-inserting with `ON CONFLICT (member_id) DO UPDATE`.
+```ts
+// Gym: ignore scoring_rules cap/points, use fixed formula
+const gymDays = data.gym.filter(g => g.member_id === m.id && (g.status === "yes" || g.status === "home")).length;
+const gymPts = Math.min(gymDays * 0.25, 5);
+
+// Macros: build Sat→Fri weeks contained in the month, award 1.25 if all 7 days logged
+const macrosByDate = new Set(
+  data.macros.filter(x => x.member_id === m.id && x.calories !== null).map(x => x.date)
+);
+let macrosPts = 0;
+for (const sat of saturdaysInMonth(anchor)) {
+  const weekDates = Array.from({length:7}, (_,i) => toISODate(addDays(sat, i)));
+  if (weekDates.every(d => macrosByDate.has(d))) macrosPts += 1.25;
+}
+macrosPts = Math.min(macrosPts, 5);
+```
+
+Helpers added to `src/lib/week.ts`:
+- `addDays(d, n)`
+- `saturdaysInMonth(anchor)` — returns each Saturday whose date is in the month
+
+Baselines (`baseline_scores`) continue to add on top, same as today.
+Sleep + deep_work logic untouched.
+
+## What you'll see
+For the screenshot you sent (gym days per person): Trolla 11→2.75, Arneet 8→2.0, Saju 10→2.5, Kazekage 5→1.25, Zoro 8→2.0, Dr GL 11→2.75, Chic Boy GL 11→2.75, Twin GL 9→2.25, Dillski 7→1.75, Chic Mun 9→2.25, Baby GL 10→2.5, Shaad Paji 9→2.25, Milan 9→2.25.
+
+For macros this week (05/16–05/22 Sat–Fri): a player earns 1.25 only after logging calories every day Sat through Fri.
+
+## Out of scope
+- No DB migration. `scoring_rules` rows for gym/macros become unused but stay (harmless; admin page still edits them but they won't affect standings).
+- No change to sleep, deep work, free days, or baselines.
