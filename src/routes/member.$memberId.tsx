@@ -248,9 +248,7 @@ function Section({
       <div className="flex items-center justify-between px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold">{title}</h2>
-          {cap !== undefined && (
-            <div className="text-[11px] text-muted-foreground">cap {cap.toFixed(2)}</div>
-          )}
+          {cap !== undefined && <div className="h-4" />}
         </div>
         <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
           {pts.toFixed(2)}
