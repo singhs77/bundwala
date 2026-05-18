@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Trophy } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Trophy, Skull } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -188,6 +188,17 @@ function Leaderboard() {
     return id;
   }, [teamTotals]);
 
+  const dogshit = useMemo(() => {
+    if (!data) return null;
+    let worst: { name: string; total: number } | null = null;
+    for (const m of data.members) {
+      const s = scores.get(m.id);
+      if (!s) continue;
+      if (!worst || s.total < worst.total) worst = { name: m.name, total: s.total };
+    }
+    return worst;
+  }, [data, scores]);
+
   return (
     <AppShell title="Standings">
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-card p-3">
@@ -199,6 +210,23 @@ function Leaderboard() {
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {dogshit && (
+        <div className="mb-3 flex items-center justify-between rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Skull className="h-4 w-4 text-destructive" />
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-destructive">
+                Most Dogshit
+              </div>
+              <div className="text-sm font-semibold">{dogshit.name}</div>
+            </div>
+          </div>
+          <div className="rounded-full bg-background/60 px-3 py-1 text-sm font-bold tabular-nums">
+            {dogshit.total.toFixed(1)}
+          </div>
+        </div>
+      )}
 
       {isLoading || !data ? (
         <div className="space-y-3">
