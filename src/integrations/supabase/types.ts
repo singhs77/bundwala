@@ -447,6 +447,10 @@ export type Database = {
         Returns: undefined
       }
       admin_verify: { Args: { _password: string }; Returns: boolean }
+      delete_deep_work: {
+        Args: { _id: string; _token: string }
+        Returns: undefined
+      }
       log_deep_work: {
         Args: {
           _date: string
