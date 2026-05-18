@@ -9,10 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SleepRouteImport } from './routes/sleep'
+import { Route as MacrosRouteImport } from './routes/macros'
 import { Route as GymRouteImport } from './routes/gym'
 import { Route as DeepWorkRouteImport } from './routes/deep-work'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SleepRoute = SleepRouteImport.update({
+  id: '/sleep',
+  path: '/sleep',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MacrosRoute = MacrosRouteImport.update({
+  id: '/macros',
+  path: '/macros',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GymRoute = GymRouteImport.update({
   id: '/gym',
   path: '/gym',
@@ -23,6 +36,11 @@ const DeepWorkRoute = DeepWorkRouteImport.update({
   path: '/deep-work',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,36 +49,62 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/deep-work': typeof DeepWorkRoute
   '/gym': typeof GymRoute
+  '/macros': typeof MacrosRoute
+  '/sleep': typeof SleepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/deep-work': typeof DeepWorkRoute
   '/gym': typeof GymRoute
+  '/macros': typeof MacrosRoute
+  '/sleep': typeof SleepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/deep-work': typeof DeepWorkRoute
   '/gym': typeof GymRoute
+  '/macros': typeof MacrosRoute
+  '/sleep': typeof SleepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/deep-work' | '/gym'
+  fullPaths: '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/deep-work' | '/gym'
-  id: '__root__' | '/' | '/deep-work' | '/gym'
+  to: '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
+  id: '__root__' | '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   DeepWorkRoute: typeof DeepWorkRoute
   GymRoute: typeof GymRoute
+  MacrosRoute: typeof MacrosRoute
+  SleepRoute: typeof SleepRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sleep': {
+      id: '/sleep'
+      path: '/sleep'
+      fullPath: '/sleep'
+      preLoaderRoute: typeof SleepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/macros': {
+      id: '/macros'
+      path: '/macros'
+      fullPath: '/macros'
+      preLoaderRoute: typeof MacrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/gym': {
       id: '/gym'
       path: '/gym'
@@ -75,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeepWorkRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,8 +138,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   DeepWorkRoute: DeepWorkRoute,
   GymRoute: GymRoute,
+  MacrosRoute: MacrosRoute,
+  SleepRoute: SleepRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
