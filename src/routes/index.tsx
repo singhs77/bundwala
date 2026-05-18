@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -12,8 +12,13 @@ import {
   startOfWeek,
   toISODate,
 } from "@/lib/week";
-import { applyCap, sumTotal, type Rule } from "@/lib/score";
+import { applyCap, sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -26,11 +31,12 @@ function Leaderboard() {
   const [anchor, setAnchor] = useState(() => new Date());
   const ws = useMemo(() => toISODate(startOfWeek(anchor)), [anchor]);
   const we = useMemo(() => toISODate(endOfWeek(anchor)), [anchor]);
+  const [openTeams, setOpenTeams] = useState<Record<string, boolean>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", ws, we],
     queryFn: async () => {
-      const [teams, members, rules, gym, dw, sleep, macros, freeDays] =
+      const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets] =
         await Promise.all([
           supabase.from("teams").select("*").order("sort_order"),
           supabase.from("members").select("*"),
@@ -47,7 +53,7 @@ function Leaderboard() {
             .lte("date", we),
           supabase
             .from("sleep_logs")
-            .select("member_id,date,hours,free_day")
+            .select("member_id,date,hours,free_day,sleep_time,wake_time")
             .gte("date", ws)
             .lte("date", we),
           supabase
@@ -56,6 +62,7 @@ function Leaderboard() {
             .gte("date", ws)
             .lte("date", we),
           supabase.from("free_days").select("date").gte("date", ws).lte("date", we),
+          supabase.from("sleep_targets").select("*"),
         ]);
       return {
         teams: teams.data ?? [],
@@ -66,6 +73,7 @@ function Leaderboard() {
         sleep: sleep.data ?? [],
         macros: macros.data ?? [],
         freeDays: (freeDays.data ?? []).map((f) => f.date),
+        targets: targets.data ?? [],
       };
     },
   });
@@ -91,6 +99,13 @@ function Leaderboard() {
         const s = data.sleep.find((x) => x.member_id === m.id && x.date === d);
         if (!s) return false;
         if (s.free_day) return true;
+        const t = data.targets.find((x: any) => x.member_id === m.id);
+        if (t?.target_sleep && t?.target_wake) {
+          return (
+            withinTimeBuffer(s.sleep_time, t.target_sleep, 90) &&
+            withinTimeBuffer(s.wake_time, t.target_wake, 90)
+          );
+        }
         return Number(s.hours ?? 0) >= 7;
       }).length;
       const macrosCount = data.macros.filter(
@@ -158,31 +173,50 @@ function Leaderboard() {
             const teamMembers = data.members.filter((m) => m.team_id === t.id);
             const total = teamTotals.get(t.id) ?? 0;
             const isLeader = t.id === leaderTeamId && total > 0;
+            const isOpen = openTeams[t.id] ?? false;
             return (
-              <section
+              <Collapsible
                 key={t.id}
+                open={isOpen}
+                onOpenChange={(o) => setOpenTeams((prev) => ({ ...prev, [t.id]: o }))}
                 className={`overflow-hidden rounded-2xl border bg-card ${
                   isLeader ? "border-primary/60 shadow-[0_0_0_1px_var(--color-primary)]" : "border-border"
                 }`}
               >
-                <header className="flex items-center justify-between gap-2 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {isLeader && <Trophy className="h-4 w-4 text-primary" />}
-                    <h2 className="text-base font-semibold">{t.name}</h2>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      {isLeader && <Trophy className="h-4 w-4 text-primary" />}
+                      <h2 className="text-base font-semibold">{t.name}</h2>
+                      <span className="text-xs text-muted-foreground">
+                        {teamMembers.length} {teamMembers.length === 1 ? "member" : "members"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
+                        {total.toFixed(1)}
+                      </div>
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </div>
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 gap-y-1 px-4 pb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <div></div>
+                    <div className="w-9 text-right">Gym</div>
+                    <div className="w-9 text-right">DW</div>
+                    <div className="w-9 text-right">Sleep</div>
+                    <div className="w-9 text-right">Macros</div>
+                    <div className="w-10 text-right text-foreground">Total</div>
                   </div>
-                  <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
-                    {total.toFixed(1)}
-                  </div>
-                </header>
-                <div className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 gap-y-1 px-4 pb-3 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <div></div>
-                  <div className="w-9 text-right">Gym</div>
-                  <div className="w-9 text-right">DW</div>
-                  <div className="w-9 text-right">Sleep</div>
-                  <div className="w-9 text-right">Macros</div>
-                  <div className="w-10 text-right text-foreground">Total</div>
-                </div>
-                <ul className="divide-y divide-border border-t border-border">
+                  <ul className="divide-y divide-border border-t border-border">
                   {teamMembers.map((m) => {
                     const s = scores.get(m.id) ?? { gym: 0, deep_work: 0, sleep: 0, macros: 0, total: 0 };
                     return (
@@ -199,8 +233,9 @@ function Leaderboard() {
                       </li>
                     );
                   })}
-                </ul>
-              </section>
+                  </ul>
+                </CollapsibleContent>
+              </Collapsible>
             );
           })}
         </div>
