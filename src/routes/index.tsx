@@ -192,6 +192,7 @@ function Leaderboard() {
     if (!data) return null;
     let worst: { name: string; total: number } | null = null;
     for (const m of data.members) {
+      if (!m.team_id) continue;
       const s = scores.get(m.id);
       if (!s) continue;
       if (!worst || s.total < worst.total) worst = { name: m.name, total: s.total };
@@ -217,7 +218,7 @@ function Leaderboard() {
             <Skull className="h-4 w-4 text-destructive" />
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-destructive">
-                Most Dogshit
+                Most Dogshit Player
               </div>
               <div className="text-sm font-semibold">{dogshit.name}</div>
             </div>
