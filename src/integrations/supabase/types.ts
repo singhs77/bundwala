@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          id: number
+          password_hash: string | null
+        }
+        Insert: {
+          id?: number
+          password_hash?: string | null
+        }
+        Update: {
+          id?: number
+          password_hash?: string | null
+        }
+        Relationships: []
+      }
       deep_work: {
         Row: {
           created_at: string
@@ -194,10 +209,40 @@ export type Database = {
           },
         ]
       }
+      member_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          member_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          member_id: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          member_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_sessions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           avatar_url: string | null
           created_at: string
+          has_password: boolean | null
           id: string
           name: string
           password_hash: string | null
@@ -206,6 +251,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          has_password?: boolean | null
           id?: string
           name: string
           password_hash?: string | null
@@ -214,6 +260,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          has_password?: boolean | null
           id?: string
           name?: string
           password_hash?: string | null
@@ -346,7 +393,92 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      _member_from_token: { Args: { _token: string }; Returns: string }
+      add_dw_comment: {
+        Args: { _body: string; _deep_work_id: string; _token: string }
+        Returns: undefined
+      }
+      admin_add_free_day: {
+        Args: { _date: string; _label: string; _password: string }
+        Returns: undefined
+      }
+      admin_remove_free_day: {
+        Args: { _date: string; _password: string }
+        Returns: undefined
+      }
+      admin_set_password: {
+        Args: { _current: string; _new: string }
+        Returns: boolean
+      }
+      admin_upsert_rule: {
+        Args: {
+          _cap: number
+          _category: string
+          _password: string
+          _points: number
+        }
+        Returns: undefined
+      }
+      admin_verify: { Args: { _password: string }; Returns: boolean }
+      log_deep_work: {
+        Args: {
+          _date: string
+          _learnings: string
+          _minutes: number
+          _personal_notes: string
+          _token: string
+          _topic: string
+        }
+        Returns: string
+      }
+      log_gym: {
+        Args: { _date: string; _status: string; _token: string }
+        Returns: undefined
+      }
+      log_macros: {
+        Args: {
+          _calories: number
+          _carbs: number
+          _date: string
+          _fat: number
+          _protein: number
+          _sugar: number
+          _token: string
+          _water: number
+        }
+        Returns: undefined
+      }
+      log_sleep: {
+        Args: {
+          _date: string
+          _hours: number
+          _sleep_time: string
+          _token: string
+          _wake_time: string
+        }
+        Returns: undefined
+      }
+      member_logout: { Args: { _token: string }; Returns: undefined }
+      member_rename: {
+        Args: { _new_name: string; _token: string }
+        Returns: undefined
+      }
+      member_set_avatar: {
+        Args: { _token: string; _url: string }
+        Returns: undefined
+      }
+      member_set_password: {
+        Args: {
+          _current_password: string
+          _member_id: string
+          _new_password: string
+        }
+        Returns: string
+      }
+      member_verify_password: {
+        Args: { _member_id: string; _password: string }
+        Returns: string
+      }
     }
     Enums: {
       gym_status: "yes" | "no" | "home"

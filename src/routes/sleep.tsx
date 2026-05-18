@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { useMe } from "@/lib/me";
+import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ function hoursBetween(sleep: string, wake: string): number {
 
 function SleepPage() {
   const me = useMe();
+  const session = useSession();
   const qc = useQueryClient();
   const today = toISODate(new Date());
   const [sleepTime, setSleepTime] = useState("");
@@ -72,13 +73,15 @@ function SleepPage() {
 
   const save = useMutation({
     mutationFn: async () => {
+      if (!session) throw new Error("Not signed in");
       const hours = hoursBetween(sleepTime, wakeTime);
-      const { error } = await supabase
-        .from("sleep_logs")
-        .upsert(
-          { member_id: me!, date: today, sleep_time: sleepTime || null, wake_time: wakeTime || null, hours },
-          { onConflict: "member_id,date" },
-        );
+      const { error } = await supabase.rpc("log_sleep", {
+        _token: session.token,
+        _date: today,
+        _sleep_time: (sleepTime || null) as any,
+        _wake_time: (wakeTime || null) as any,
+        _hours: hours,
+      });
       if (error) throw error;
     },
     onSuccess: () => {

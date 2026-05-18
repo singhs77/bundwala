@@ -1,64 +1,67 @@
-# Group Tracker App — Plan
+# Pre-launch fix plan
 
-A mobile-first PWA-style web app replacing your Google Sheet. Anyone with the link picks their name and starts logging. Lovable Cloud (Postgres + storage) powers persistence so the whole crew sees the same data in real time.
+Skipping #9 (notifications) per your call. Everything else, grouped into 3 milestones so each step is verifiable before moving on.
 
-## Stack
-- TanStack Start + Tailwind, dark athletic theme (#0a0a0a bg, green/red accents matching the sheet)
-- Lovable Cloud for database + realtime updates
-- No login — a "Who are you?" name picker on first visit, stored in localStorage (switchable anytime)
+---
 
-## Pages
+## Milestone 1 — Lock the backend down (#1, #2, #6)
 
-1. **Home / Leaderboard** — Team standings (cards mirroring screenshot 1: team name, member rows, Gym/Macros/Deep Work/Sleep columns, totals, highlight leader). Tap a team to expand member breakdowns. Current-week by default with a week picker.
-2. **Gym** — Daily check-in tile: Yes / No / Home Workout buttons for today. Below it, a 7-day strip showing your history (red/green pills like the sheet).
-3. **Deep Work** — Big "+ Log session" button. Form: topic, time spent, start/finish (auto-filled with now), quick learnings, personal comments. Feed below shows everyone's recent sessions with comment thread.
-4. **Sleep** — Time-picker for sleep + wake; hours-slept auto-calculated. Shows your sleep-schedule target (from screenshot 5 right table) and whether you hit it.
-5. **Macros** — Daily entry (calories, protein, carbs, fat, sugar, water). Weekly average card per person.
-6. **Admin** — Manage members, assign to teams, edit scoring rules (points per entry + weekly caps per category), mark "Meeting Day (Free Points)".
+The biggest risk. Done in one migration + one code pass.
 
-## Scoring engine
-Configurable rules table; leaderboard totals recompute from raw logs + rules. Defaults seeded from your sheet (0.2/entry, weekly caps inferred per category). You can tweak anytime from Admin.
+**Database migration**
+- Enable `pgcrypto` for bcrypt password hashing.
+- New table `member_sessions(token uuid pk, member_id, expires_at)` — 30-day rolling sessions.
+- Server-side RPC functions (SECURITY DEFINER, bypass RLS safely):
+  - `member_set_password(member_id, current_password, new_password)` — bcrypt, verifies old password if one exists, returns new session token.
+  - `member_verify_password(member_id, password)` — returns session token or null.
+  - `member_rename(token, new_name)`.
+  - `log_gym(token, date, status)`, `log_sleep(...)`, `log_macros(...)`, `log_deep_work(...)`, `add_dw_comment(...)`.
+- RLS lockdown:
+  - `members`: SELECT allowed for the safe columns only (id, name, team_id, avatar_url) via a `members_public` view; direct UPDATE/DELETE denied. `password_hash` no longer readable.
+  - All activity tables (`gym_logs`, `sleep_logs`, `macros_logs`, `deep_work`, `dw_comments`): SELECT stays public (group feed), INSERT/UPDATE/DELETE denied to anon — mutations must go through the RPC functions, which verify the session token.
+  - `scoring_rules`, `free_days`: SELECT public, writes require an admin token (we'll seed one admin password for you).
+- Add the activity tables to `supabase_realtime` publication for #6.
 
-## Data model
+**Frontend refactor**
+- New `src/lib/session.ts`: stores `{ memberId, token }` in localStorage. `useMe()` exposes both.
+- All `.upsert/.insert/.delete` calls in gym/sleep/macros/deep-work/admin/MemberPicker swap to `supabase.rpc("...")` with the token.
+- Leaderboard subscribes to realtime channels on the 4 activity tables and invalidates the query on any change.
 
-```text
-members      (id, name, avatar_url, team_id)
-teams        (id, name, color, logo_url)
-gym_logs     (id, member_id, date, status)            -- yes/no/home
-deep_work    (id, member_id, date, topic, minutes,
-              started_at, finished_at, learnings, personal_notes)
-dw_comments  (id, deep_work_id, author_id, body)
-sleep_logs   (id, member_id, date, sleep_time,
-              wake_time, hours, free_day)
-sleep_targets(member_id, target_sleep, target_wake)
-macros_logs  (id, member_id, date, calories, protein,
-              carbs, fat, sugar, water)
-scoring_rules(category, points_per_entry, weekly_cap)
-free_days    (date, label)
-```
+**Caveat**: existing password hashes are unsalted SHA-256. The migration will re-hash on next login (one-time prompt: "for security, please re-enter your password"). No data loss.
 
-A SQL view `weekly_scores` aggregates per member/team per week applying caps.
+---
 
-## Seed data (from your screenshots)
-- Teams: Straw boys, Team PDIO, Shaad Twins, OYE, Free Agent
-- Members assigned to their teams
-- Sleep targets per member from screenshot 5
-- Default scoring: 0.2/entry, caps Gym 7, Deep Work 3, Sleep 5, Macros 3 per week (editable)
+## Milestone 2 — Data entry UX (#3, #4, #5, #8)
 
-## Mobile UX
-- Bottom tab bar: Home · Gym · Deep Work · Sleep · Macros
-- Big tap targets, swipe-friendly cards, no horizontal scroll
-- Add-to-Home-Screen meta tags so it feels like an app
+- **Date picker on Gym, Sleep, Macros** — defaults to today, lets you backfill any past date. Shadcn `Popover + Calendar`.
+- **Validation** — zod schema on macros (0–10000 int, no NaN), deep-work minutes (1–600), sleep hours (computed, capped 0–16). Friendly inline errors instead of DB errors.
+- **Stop `useEffect` clobbering input** — only seed local state once per date change, not on every refetch (`useRef` guard).
+- **Historical view** for Sleep and Macros — same week-nav pattern as Leaderboard.
 
-## Build order
-1. Enable Lovable Cloud, create schema, seed teams + members
-2. Name picker + member context
-3. Leaderboard with live scores view
-4. Gym tracker
-5. Deep Work log + comments
-6. Sleep log with targets
-7. Macros + weekly averages
-8. Admin (scoring rules, members, free days)
-9. PWA polish + bottom nav
+---
 
-Reply "go" to build, or tell me what to change (e.g. swap any tracker order, adjust the team list, different default caps).
+## Milestone 3 — Polish (#7, #10)
+
+- Skeleton loaders on Gym, Macros, Deep Work, Sleep.
+- Empty states for the 14-day gym grid and macros averages.
+- **Avatars**: create `avatars` storage bucket (public read, member-scoped writes via RPC). Upload UI in the rename dialog. Initials fallback everywhere `members.name` is displayed (leaderboard, deep work feed, badge).
+- Fix tied-leader bug (multiple teams highlighted when tied).
+
+---
+
+## Tech notes (skip if not interested)
+
+- All RPCs take `token uuid` as first arg; the function resolves `member_id` from `member_sessions` and rejects expired sessions. This makes "users can only edit their own data" enforced at the DB level — even if someone opens the JS console.
+- The `members_public` view is used everywhere the UI lists members. The raw `members` table is locked.
+- Realtime: client subscribes once per active leaderboard page; on any insert/update/delete it calls `queryClient.invalidateQueries(["leaderboard"])` (debounced 500ms to avoid spam).
+- Admin token: I'll seed it with a default password ("changeme") and surface a one-time setup screen the first time you visit `/admin`.
+
+---
+
+## Order of operations
+
+1. M1 migration + frontend refactor → test logging works as your own user, can't write as someone else.
+2. M2 → backfill missed days, validation catches garbage.
+3. M3 → looks polished, avatars show up.
+
+After approval I'll start with M1. Roughly 3 tool-heavy turns total.

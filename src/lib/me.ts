@@ -1,24 +1,45 @@
 import { useEffect, useState } from "react";
 
-const KEY = "tracker.member";
+const KEY_ID = "tracker.member";
+const KEY_TOKEN = "tracker.token";
 
-export function getStoredMemberId(): string | null {
+export type Session = { memberId: string; token: string } | null;
+
+export function getSession(): Session {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(KEY);
+  const memberId = window.localStorage.getItem(KEY_ID);
+  const token = window.localStorage.getItem(KEY_TOKEN);
+  if (!memberId || !token) return null;
+  return { memberId, token };
 }
 
-export function setStoredMemberId(id: string | null) {
+export function setSession(s: Session) {
   if (typeof window === "undefined") return;
-  if (id) window.localStorage.setItem(KEY, id);
-  else window.localStorage.removeItem(KEY);
+  if (s) {
+    window.localStorage.setItem(KEY_ID, s.memberId);
+    window.localStorage.setItem(KEY_TOKEN, s.token);
+  } else {
+    window.localStorage.removeItem(KEY_ID);
+    window.localStorage.removeItem(KEY_TOKEN);
+  }
   window.dispatchEvent(new Event("tracker:me"));
 }
 
-export function useMe() {
-  const [id, setId] = useState<string | null>(null);
+export function clearSession() {
+  setSession(null);
+}
+
+/** Returns the current member id (or null). */
+export function useMe(): string | null {
+  return useSession()?.memberId ?? null;
+}
+
+/** Returns full session {memberId, token} or null. */
+export function useSession(): Session {
+  const [s, setS] = useState<Session>(null);
   useEffect(() => {
-    setId(getStoredMemberId());
-    const h = () => setId(getStoredMemberId());
+    setS(getSession());
+    const h = () => setS(getSession());
     window.addEventListener("tracker:me", h);
     window.addEventListener("storage", h);
     return () => {
@@ -26,5 +47,5 @@ export function useMe() {
       window.removeEventListener("storage", h);
     };
   }, []);
-  return id;
+  return s;
 }
