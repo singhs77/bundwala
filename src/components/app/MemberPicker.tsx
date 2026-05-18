@@ -198,6 +198,7 @@ function RenameDialog({
   const me = useMe();
   const { data: members } = useMembersQuery();
   const { data: teams } = useTeamsQuery();
+  const qc = useQueryClient();
   const current = members?.find((m) => m.id === me) as Member | undefined;
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -216,6 +217,8 @@ function RenameDialog({
       if (error) throw error;
       toast.success(teamId ? "Joined team" : "Left team");
       onRenamed();
+      qc.invalidateQueries({ queryKey: ["members"] });
+      qc.invalidateQueries({ queryKey: ["leaderboard"] });
     } catch (e: any) {
       toast.error(String(e.message || e));
     } finally {
