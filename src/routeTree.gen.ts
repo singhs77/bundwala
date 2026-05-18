@@ -15,6 +15,7 @@ import { Route as GymRouteImport } from './routes/gym'
 import { Route as DeepWorkRouteImport } from './routes/deep-work'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MemberMemberIdRouteImport } from './routes/member.$memberId'
 
 const SleepRoute = SleepRouteImport.update({
   id: '/sleep',
@@ -46,6 +47,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MemberMemberIdRoute = MemberMemberIdRouteImport.update({
+  id: '/member/$memberId',
+  path: '/member/$memberId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/member/$memberId': typeof MemberMemberIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/member/$memberId': typeof MemberMemberIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,13 +79,36 @@ export interface FileRoutesById {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/member/$memberId': typeof MemberMemberIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/deep-work'
+    | '/gym'
+    | '/macros'
+    | '/sleep'
+    | '/member/$memberId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
-  id: '__root__' | '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
+  to:
+    | '/'
+    | '/admin'
+    | '/deep-work'
+    | '/gym'
+    | '/macros'
+    | '/sleep'
+    | '/member/$memberId'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/deep-work'
+    | '/gym'
+    | '/macros'
+    | '/sleep'
+    | '/member/$memberId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +118,7 @@ export interface RootRouteChildren {
   GymRoute: typeof GymRoute
   MacrosRoute: typeof MacrosRoute
   SleepRoute: typeof SleepRoute
+  MemberMemberIdRoute: typeof MemberMemberIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/member/$memberId': {
+      id: '/member/$memberId'
+      path: '/member/$memberId'
+      fullPath: '/member/$memberId'
+      preLoaderRoute: typeof MemberMemberIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -143,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   GymRoute: GymRoute,
   MacrosRoute: MacrosRoute,
   SleepRoute: SleepRoute,
+  MemberMemberIdRoute: MemberMemberIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
