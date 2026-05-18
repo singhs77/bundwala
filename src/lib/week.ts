@@ -36,3 +36,30 @@ export function formatRange(d: Date): string {
   const fmt = (x: Date) => `${x.getMonth() + 1}/${x.getDate()}`;
   return `${fmt(s)} – ${fmt(e)}`;
 }
+
+export function startOfMonth(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), 1);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+export function endOfMonth(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+export function daysOfMonth(d: Date): Date[] {
+  const s = startOfMonth(d);
+  const e = endOfMonth(d);
+  const n = e.getDate();
+  return Array.from({ length: n }, (_, i) => {
+    const x = new Date(s);
+    x.setDate(s.getDate() + i);
+    return x;
+  });
+}
+export function shiftMonth(d: Date, delta: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + delta, 1);
+}
+export function formatMonth(d: Date): string {
+  return d.toLocaleString(undefined, { month: "long", year: "numeric" });
+}

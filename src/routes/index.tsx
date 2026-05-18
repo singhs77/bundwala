@@ -5,11 +5,11 @@ import { ChevronDown, ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  daysOfWeek,
-  endOfWeek,
-  formatRange,
-  shiftWeek,
-  startOfWeek,
+  daysOfMonth,
+  endOfMonth,
+  formatMonth,
+  shiftMonth,
+  startOfMonth,
   toISODate,
 } from "@/lib/week";
 import { applyCap, sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
@@ -30,8 +30,10 @@ export const Route = createFileRoute("/")({
 
 function Leaderboard() {
   const [anchor, setAnchor] = useState(() => new Date());
-  const ws = useMemo(() => toISODate(startOfWeek(anchor)), [anchor]);
-  const we = useMemo(() => toISODate(endOfWeek(anchor)), [anchor]);
+  const ws = useMemo(() => toISODate(startOfMonth(anchor)), [anchor]);
+  const we = useMemo(() => toISODate(endOfMonth(anchor)), [anchor]);
+  const daysInMonth = useMemo(() => daysOfMonth(anchor).length, [anchor]);
+  const capScale = useMemo(() => daysInMonth / 7, [daysInMonth]);
   const [openTeams, setOpenTeams] = useState<Record<string, boolean>>({});
   const qc = useQueryClient();
 
@@ -112,7 +114,7 @@ function Leaderboard() {
 
   const scores = useMemo(() => {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
-    const week = daysOfWeek(anchor).map(toISODate);
+    const month = daysOfMonth(anchor).map(toISODate);
     const result = new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
     for (const m of data.members) {
       const gymCount = data.gym.filter(
@@ -120,7 +122,7 @@ function Leaderboard() {
       ).length;
       const dwCount = data.dw.filter((d) => d.member_id === m.id).length;
       // Sleep: count days where hit (>=7h) OR was a free day, but only days where they had entry or free day
-      const sleepCount = week.filter((d) => {
+      const sleepCount = month.filter((d) => {
         if (data.freeDays.includes(d)) return true;
         const s = data.sleep.find((x) => x.member_id === m.id && x.date === d);
         if (!s) return false;
@@ -137,18 +139,20 @@ function Leaderboard() {
       const macrosCount = data.macros.filter(
         (x) => x.member_id === m.id && x.calories !== null,
       ).length;
+      const scaleRule = (r?: Rule): Rule | undefined =>
+        r ? { ...r, weekly_cap: Number(r.weekly_cap) * capScale } : r;
       const cat = {
-        gym: applyCap(gymCount, ruleMap.get("gym")),
-        deep_work: applyCap(dwCount, ruleMap.get("deep_work")),
-        sleep: applyCap(sleepCount, ruleMap.get("sleep")),
-        macros: applyCap(macrosCount, ruleMap.get("macros")),
+        gym: applyCap(gymCount, scaleRule(ruleMap.get("gym"))),
+        deep_work: applyCap(dwCount, scaleRule(ruleMap.get("deep_work"))),
+        sleep: applyCap(sleepCount, scaleRule(ruleMap.get("sleep"))),
+        macros: applyCap(macrosCount, scaleRule(ruleMap.get("macros"))),
         total: 0,
       };
       cat.total = sumTotal(cat);
       result.set(m.id, cat);
     }
     return result;
-  }, [data, ruleMap, anchor]);
+  }, [data, ruleMap, anchor, capScale]);
 
   const teamTotals = useMemo(() => {
     if (!data) return new Map<string, number>();
@@ -178,11 +182,11 @@ function Leaderboard() {
   return (
     <AppShell title="Standings">
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-card p-3">
-        <Button variant="ghost" size="icon" onClick={() => setAnchor((d) => shiftWeek(d, -1))}>
+        <Button variant="ghost" size="icon" onClick={() => setAnchor((d) => shiftMonth(d, -1))}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <div className="text-sm font-medium">Week of {formatRange(anchor)}</div>
-        <Button variant="ghost" size="icon" onClick={() => setAnchor((d) => shiftWeek(d, 1))}>
+        <div className="text-sm font-medium">{formatMonth(anchor)}</div>
+        <Button variant="ghost" size="icon" onClick={() => setAnchor((d) => shiftMonth(d, 1))}>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
