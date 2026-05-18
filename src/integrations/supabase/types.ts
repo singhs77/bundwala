@@ -29,6 +29,33 @@ export type Database = {
         }
         Relationships: []
       }
+      baseline_scores: {
+        Row: {
+          deep_work: number
+          gym: number
+          macros: number
+          member_id: string
+          sleep: number
+          updated_at: string
+        }
+        Insert: {
+          deep_work?: number
+          gym?: number
+          macros?: number
+          member_id: string
+          sleep?: number
+          updated_at?: string
+        }
+        Update: {
+          deep_work?: number
+          gym?: number
+          macros?: number
+          member_id?: string
+          sleep?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deep_work: {
         Row: {
           created_at: string
