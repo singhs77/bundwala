@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toISODate } from "@/lib/week";
 import { toast } from "sonner";
 import { withinTimeBuffer } from "@/lib/score";
+import { Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/sleep")({
   head: () => ({ meta: [{ title: "Sleep — Group Tracker" }] }),
@@ -94,6 +95,24 @@ function SleepPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const del = useMutation({
+    mutationFn: async (date: string) => {
+      if (!session) throw new Error("Not signed in");
+      const { error } = await supabase.rpc("delete_sleep", {
+        _token: session.token,
+        _date: date,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sleep-today"] });
+      qc.invalidateQueries({ queryKey: ["sleep-recent"] });
+      qc.invalidateQueries({ queryKey: ["leaderboard"] });
+      toast.success("Deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const hours = hoursBetween(sleepTime, wakeTime);
   const sleepOk = target?.target_sleep
     ? withinTimeBuffer(sleepTime, target.target_sleep, 90)
@@ -173,12 +192,22 @@ function SleepPage() {
         <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Last 7 entries</h3>
         <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
           {recent?.length ? recent.map((r) => (
-            <li key={r.id} className="flex items-center justify-between px-4 py-3 text-sm">
-              <span className="font-medium">{r.date}</span>
-              <span className="text-muted-foreground">
+            <li key={r.id} className="flex items-center justify-between gap-2 px-4 py-3 text-sm">
+              <span className="w-20 font-medium">{r.date}</span>
+              <span className="flex-1 text-center text-muted-foreground">
                 {r.sleep_time?.slice(0, 5)} → {r.wake_time?.slice(0, 5)}
               </span>
               <span className="font-bold tabular-nums">{Number(r.hours ?? 0).toFixed(1)}h</span>
+              <button
+                onClick={() => {
+                  if (confirm(`Delete sleep log for ${r.date}?`)) del.mutate(r.date);
+                }}
+                disabled={del.isPending}
+                className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                aria-label="Delete entry"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </li>
           )) : <li className="p-4 text-center text-sm text-muted-foreground">No entries yet.</li>}
         </ul>
