@@ -303,6 +303,45 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          enabled: boolean
+          endpoint: string
+          id: string
+          last_reminder_date: string | null
+          member_id: string
+          p256dh: string
+          reminder_local_time: string | null
+          tz_offset_minutes: number
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          enabled?: boolean
+          endpoint: string
+          id?: string
+          last_reminder_date?: string | null
+          member_id: string
+          p256dh: string
+          reminder_local_time?: string | null
+          tz_offset_minutes?: number
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          enabled?: boolean
+          endpoint?: string
+          id?: string
+          last_reminder_date?: string | null
+          member_id?: string
+          p256dh?: string
+          reminder_local_time?: string | null
+          tz_offset_minutes?: number
+        }
+        Relationships: []
+      }
       scoring_rules: {
         Row: {
           category: string
@@ -429,6 +468,16 @@ export type Database = {
         Args: { _date: string; _label: string; _password: string }
         Returns: undefined
       }
+      admin_list_subscriptions: {
+        Args: { _password: string }
+        Returns: {
+          auth: string
+          endpoint: string
+          id: string
+          member_id: string
+          p256dh: string
+        }[]
+      }
       admin_remove_free_day: {
         Args: { _date: string; _password: string }
         Returns: undefined
@@ -451,9 +500,26 @@ export type Database = {
         Args: { _id: string; _token: string }
         Returns: undefined
       }
+      delete_push_subscription: {
+        Args: { _endpoint: string; _token: string }
+        Returns: undefined
+      }
+      delete_push_subscription_by_endpoint: {
+        Args: { _endpoint: string }
+        Returns: undefined
+      }
       delete_sleep: {
         Args: { _date: string; _token: string }
         Returns: undefined
+      }
+      list_due_reminders: {
+        Args: never
+        Returns: {
+          auth: string
+          endpoint: string
+          id: string
+          p256dh: string
+        }[]
       }
       log_deep_work: {
         Args: {
@@ -493,6 +559,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_reminder_sent: { Args: { _id: string }; Returns: undefined }
       member_logout: { Args: { _token: string }; Returns: undefined }
       member_rename: {
         Args: { _new_name: string; _token: string }
@@ -517,6 +584,28 @@ export type Database = {
       member_verify_password: {
         Args: { _member_id: string; _password: string }
         Returns: string
+      }
+      update_push_reminder: {
+        Args: {
+          _enabled: boolean
+          _endpoint: string
+          _reminder_local_time: string
+          _token: string
+          _tz_offset_minutes: number
+        }
+        Returns: undefined
+      }
+      upsert_push_subscription: {
+        Args: {
+          _auth: string
+          _enabled: boolean
+          _endpoint: string
+          _p256dh: string
+          _reminder_local_time: string
+          _token: string
+          _tz_offset_minutes: number
+        }
+        Returns: undefined
       }
     }
     Enums: {
