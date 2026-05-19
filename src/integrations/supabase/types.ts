@@ -451,6 +451,10 @@ export type Database = {
         Args: { _id: string; _token: string }
         Returns: undefined
       }
+      delete_sleep: {
+        Args: { _date: string; _token: string }
+        Returns: undefined
+      }
       log_deep_work: {
         Args: {
           _date: string
