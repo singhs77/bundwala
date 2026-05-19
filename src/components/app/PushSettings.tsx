@@ -59,7 +59,12 @@ export function PushSettings() {
     setLoading(true);
     try {
       const perm = await requestPermission();
-      if (perm !== "granted") throw new Error("Permission denied");
+      if (perm === "denied") {
+        throw new Error(
+          "Notifications are blocked in your browser. Tap the lock icon in the address bar → Site settings → allow Notifications, then try again."
+        );
+      }
+      if (perm !== "granted") throw new Error("Permission not granted");
       const sub = await ensureSubscription();
       await saveSubscription({
         token: session.token,
