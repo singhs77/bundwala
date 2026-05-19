@@ -15,6 +15,7 @@ import { Route as GymRouteImport } from './routes/gym'
 import { Route as DeepWorkRouteImport } from './routes/deep-work'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicHooksSendRemindersRouteImport } from './routes/api/public/hooks/send-reminders'
 
 const SleepRoute = SleepRouteImport.update({
   id: '/sleep',
@@ -46,6 +47,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksSendRemindersRoute =
+  ApiPublicHooksSendRemindersRouteImport.update({
+    id: '/api/public/hooks/send-reminders',
+    path: '/api/public/hooks/send-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByFullPath {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +70,7 @@ export interface FileRoutesByTo {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,13 +80,36 @@ export interface FileRoutesById {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/deep-work'
+    | '/gym'
+    | '/macros'
+    | '/sleep'
+    | '/api/public/hooks/send-reminders'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
-  id: '__root__' | '/' | '/admin' | '/deep-work' | '/gym' | '/macros' | '/sleep'
+  to:
+    | '/'
+    | '/admin'
+    | '/deep-work'
+    | '/gym'
+    | '/macros'
+    | '/sleep'
+    | '/api/public/hooks/send-reminders'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/deep-work'
+    | '/gym'
+    | '/macros'
+    | '/sleep'
+    | '/api/public/hooks/send-reminders'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +119,7 @@ export interface RootRouteChildren {
   GymRoute: typeof GymRoute
   MacrosRoute: typeof MacrosRoute
   SleepRoute: typeof SleepRoute
+  ApiPublicHooksSendRemindersRoute: typeof ApiPublicHooksSendRemindersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/send-reminders': {
+      id: '/api/public/hooks/send-reminders'
+      path: '/api/public/hooks/send-reminders'
+      fullPath: '/api/public/hooks/send-reminders'
+      preLoaderRoute: typeof ApiPublicHooksSendRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -143,17 +183,8 @@ const rootRouteChildren: RootRouteChildren = {
   GymRoute: GymRoute,
   MacrosRoute: MacrosRoute,
   SleepRoute: SleepRoute,
+  ApiPublicHooksSendRemindersRoute: ApiPublicHooksSendRemindersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

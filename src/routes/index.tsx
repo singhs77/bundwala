@@ -22,6 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { PushSettings } from "@/components/app/PushSettings";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -227,6 +228,10 @@ function Leaderboard() {
         <Button variant="ghost" size="icon" onClick={() => setAnchor((d) => shiftMonth(d, 1))}>
           <ChevronRight className="h-4 w-4" />
         </Button>
+      </div>
+
+      <div className="mb-3">
+        <PushSettings />
       </div>
 
       {dogshit && (
