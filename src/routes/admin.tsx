@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { sendAdminBroadcast } from "@/lib/push.functions";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — Group Tracker" }] }),
@@ -109,7 +112,80 @@ function AdminPage() {
           ))}
         </ul>
       </section>
+
+      <BroadcastSection />
     </AppShell>
+  );
+}
+
+function BroadcastSection() {
+  const broadcast = useServerFn(sendAdminBroadcast);
+  const [password, setPassword] = useState("");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function send() {
+    if (!password || !title || !body) return;
+    setPending(true);
+    try {
+      const res = await broadcast({ data: { password, title, body } });
+      toast.success(`Sent: ${res.sent}, failed: ${res.failed}`);
+      setTitle("");
+      setBody("");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold text-muted-foreground">Broadcast notification</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Send a push notification to every member who has notifications enabled.
+      </p>
+      <div className="mt-3 space-y-2">
+        <div>
+          <Label htmlFor="bp">Admin password</Label>
+          <Input
+            id="bp"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="bt">Title</Label>
+          <Input
+            id="bt"
+            maxLength={80}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Heads up team"
+          />
+        </div>
+        <div>
+          <Label htmlFor="bb">Message</Label>
+          <Textarea
+            id="bb"
+            maxLength={300}
+            rows={3}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Don't forget to log your workouts today."
+          />
+        </div>
+        <Button
+          className="w-full"
+          onClick={send}
+          disabled={pending || !password || !title || !body}
+        >
+          {pending ? "Sending…" : "Send broadcast"}
+        </Button>
+      </div>
+    </section>
   );
 }
 
