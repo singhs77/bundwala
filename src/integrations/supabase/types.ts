@@ -29,6 +29,24 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       baseline_scores: {
         Row: {
           deep_work: number
@@ -303,6 +321,33 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          id: number
+          last_sent_date: string | null
+          reminder_body: string
+          reminder_time: string
+          reminder_title: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          last_sent_date?: string | null
+          reminder_body?: string
+          reminder_time?: string
+          reminder_title?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          last_sent_date?: string | null
+          reminder_body?: string
+          reminder_time?: string
+          reminder_title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -468,6 +513,10 @@ export type Database = {
         Args: { _date: string; _label: string; _password: string }
         Returns: undefined
       }
+      admin_delete_announcement: {
+        Args: { _id: string; _password: string }
+        Returns: undefined
+      }
       admin_list_subscriptions: {
         Args: { _password: string }
         Returns: {
@@ -478,6 +527,10 @@ export type Database = {
           p256dh: string
         }[]
       }
+      admin_post_announcement: {
+        Args: { _body: string; _password: string }
+        Returns: string
+      }
       admin_remove_free_day: {
         Args: { _date: string; _password: string }
         Returns: undefined
@@ -485,6 +538,15 @@ export type Database = {
       admin_set_password: {
         Args: { _current: string; _new: string }
         Returns: boolean
+      }
+      admin_update_notification_settings: {
+        Args: {
+          _body: string
+          _password: string
+          _time: string
+          _title: string
+        }
+        Returns: undefined
       }
       admin_upsert_rule: {
         Args: {
@@ -512,13 +574,23 @@ export type Database = {
         Args: { _date: string; _token: string }
         Returns: undefined
       }
+      get_notification_settings: {
+        Args: never
+        Returns: {
+          reminder_body: string
+          reminder_time: string
+          reminder_title: string
+        }[]
+      }
       list_due_reminders: {
         Args: never
         Returns: {
           auth: string
+          body: string
           endpoint: string
           id: string
           p256dh: string
+          title: string
         }[]
       }
       log_deep_work: {
@@ -559,6 +631,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_global_reminder_sent: { Args: never; Returns: undefined }
       mark_reminder_sent: { Args: { _id: string }; Returns: undefined }
       member_logout: { Args: { _token: string }; Returns: undefined }
       member_rename: {

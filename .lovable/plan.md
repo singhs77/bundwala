@@ -1,49 +1,68 @@
-## Goal
-Update the monthly scoring math on the Standings page for **gym** and **macros**. No schema changes, no other categories touched.
+## 1. Fix iOS top cutoff (Home Screen install)
 
-## New rules
+In `src/components/app/AppShell.tsx`, add safe-area padding to the sticky header so the status bar / notch doesn't cover it:
 
-**Gym** — linear 0.25 pts per qualifying day, capped at 5 pts/month
-- Qualifying day = `gym_logs.status` is `yes` or `home` (unchanged)
-- 20 days → 5 pts. Below 20 = `days × 0.25`.
+- Wrap the outer container with `pt-[env(safe-area-inset-top)]` and `min-h-[100svh]`.
+- Header gets `pt-[max(env(safe-area-inset-top),0.75rem)]` so the title sits below the iOS status bar when launched standalone.
 
-**Macros** — 1.25 pts per fully-logged week (Sat→Fri), capped at 5 pts/month
-- A week earns 1.25 only if there are macros entries with non-null `calories` on **all 7 days** of that Sat→Fri week.
-- Only weeks whose Saturday falls within the displayed month count (so partial overlap weeks at month edges don't earn — keeps it deterministic). I'll surface this in code comments; if you'd rather count weeks that *overlap* the month, say so and I'll switch.
+(Bottom nav already handles `safe-area-inset-bottom`.)
 
-## Implementation (single file)
+## 2. Admin-controlled daily reminder (global)
 
-Edit `src/routes/index.tsx` `scores` memo:
+Remove per-user time picker; admin picks one time + message that goes to everyone.
 
-```ts
-// Gym: ignore scoring_rules cap/points, use fixed formula
-const gymDays = data.gym.filter(g => g.member_id === m.id && (g.status === "yes" || g.status === "home")).length;
-const gymPts = Math.min(gymDays * 0.25, 5);
+**DB migration** — new table `notification_settings` (single row, id=1):
+- `reminder_time time` (default `20:00`)
+- `reminder_title text` (default "Daily check-in")
+- `reminder_body text` (default "Don't forget to log gym and macros today.")
+- `last_sent_date date` (so the cron only fires once/day)
 
-// Macros: build Sat→Fri weeks contained in the month, award 1.25 if all 7 days logged
-const macrosByDate = new Set(
-  data.macros.filter(x => x.member_id === m.id && x.calories !== null).map(x => x.date)
-);
-let macrosPts = 0;
-for (const sat of saturdaysInMonth(anchor)) {
-  const weekDates = Array.from({length:7}, (_,i) => toISODate(addDays(sat, i)));
-  if (weekDates.every(d => macrosByDate.has(d))) macrosPts += 1.25;
-}
-macrosPts = Math.min(macrosPts, 5);
-```
+New RPCs (security definer):
+- `admin_get_notification_settings()` — public read.
+- `admin_update_notification_settings(_password, _time, _title, _body)` — admin-gated.
+- Replace `list_due_reminders()` so it returns ALL enabled subscriptions when current UTC ≥ today's `reminder_time` (treated as UTC for simplicity — group is local enough) AND `last_sent_date <> today`, then bumps `last_sent_date`.
+- Drop the per-subscription `reminder_local_time` usage in scheduling (keep column for backward compat but ignore).
 
-Helpers added to `src/lib/week.ts`:
-- `addDays(d, n)`
-- `saturdaysInMonth(anchor)` — returns each Saturday whose date is in the month
+**Server function** — update `sendDueReminders` in `src/lib/push.functions.ts` to fetch settings, send `{title, body}` from DB, and mark the global `last_sent_date` afterwards.
 
-Baselines (`baseline_scores`) continue to add on top, same as today.
-Sleep + deep_work logic untouched.
+**UI**:
+- `src/components/app/PushSettings.tsx` becomes a simple Enable/Disable toggle (no time picker). Shows "Daily reminders are sent at HH:MM by the admin".
+- `src/routes/admin.tsx` gets a new section "Daily reminder" with time picker, title, message, save (password-protected like other admin actions).
 
-## What you'll see
-For the screenshot you sent (gym days per person): Trolla 11→2.75, Arneet 8→2.0, Saju 10→2.5, Kazekage 5→1.25, Zoro 8→2.0, Dr GL 11→2.75, Chic Boy GL 11→2.75, Twin GL 9→2.25, Dillski 7→1.75, Chic Mun 9→2.25, Baby GL 10→2.5, Shaad Paji 9→2.25, Milan 9→2.25.
+## 3. Announcements board on Standings page
 
-For macros this week (05/16–05/22 Sat–Fri): a player earns 1.25 only after logging calories every day Sat through Fri.
+**DB migration** — new table `announcements`:
+- `id uuid pk`, `body text`, `created_at timestamptz default now()`.
+- RLS: public select. Mutations via RPC only.
+- `admin_post_announcement(_password, _body)` and `admin_delete_announcement(_password, _id)`.
 
-## Out of scope
-- No DB migration. `scoring_rules` rows for gym/macros become unused but stay (harmless; admin page still edits them but they won't affect standings).
-- No change to sleep, deep work, free days, or baselines.
+**UI**:
+- `src/components/app/Announcements.tsx`: fetches latest 10, renders list of cards above the leaderboard. Subscribed via realtime for live updates.
+- `src/routes/index.tsx`: render `<Announcements />` right under the month switcher, above `<PushSettings />`.
+- `src/routes/admin.tsx`: new "Announcements" section — textarea + post button, plus list of existing with delete buttons (password reused from other admin forms via a local input).
+
+## 4. New macros scoring
+
+Replace the "1.25 per Sat→Fri full week, cap 5" logic in `src/routes/index.tsx`.
+
+New rule (client-side calc, no DB change):
+- `pointsPerLog = daysInMonth / 5` (e.g. 30-day → 6.0, 31-day → 6.2, 28-day → 5.6).
+- A "log" = a `macros_logs` row in the current month for that member where `date` is **today or yesterday relative to when it was created** — interpreted as: only logs for current month dates count, one point unit per dated log, capped at **5 pts total / month**.
+- Implementation: count distinct dates the member has a macros row in the visible month → `Math.min(count * (daysInMonth / 5), 5)`. This naturally caps after a few logs (5 logs in a 30-day month maxes the category).
+
+Effectively: log a couple days = max out macros. Matches the "capped at 5 total" answer.
+
+Note: the "today or yesterday" gating already lives in the macros UI (only those two buttons exist), so any row in `macros_logs` was created via that flow. No backend enforcement needed.
+
+## Technical summary
+
+Files touched:
+- `src/components/app/AppShell.tsx` — safe-area padding.
+- `src/components/app/PushSettings.tsx` — strip time picker.
+- `src/components/app/Announcements.tsx` — new.
+- `src/routes/index.tsx` — render announcements; rewrite macros scoring branch.
+- `src/routes/admin.tsx` — Daily-reminder section + Announcements section.
+- `src/lib/push.functions.ts` — read settings, send dynamic title/body.
+- New migration: `notification_settings`, `announcements`, RPCs, updated `list_due_reminders`.
+
+No new secrets needed (VAPID already set). Existing pg_cron job keeps pinging `/api/public/hooks/send-reminders` every 15 min.

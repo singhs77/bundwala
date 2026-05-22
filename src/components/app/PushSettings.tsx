@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/lib/me";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -9,8 +10,6 @@ import {
   saveSubscription,
 } from "@/lib/push";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Bell, BellOff } from "lucide-react";
 
@@ -18,9 +17,15 @@ export function PushSettings() {
   const session = useSession();
   const [supported, setSupported] = useState(false);
   const [endpoint, setEndpoint] = useState<string | null>(null);
-  const [reminderTime, setReminderTime] = useState("20:00");
-  const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  const { data: settings } = useQuery({
+    queryKey: ["notification_settings"],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_notification_settings");
+      return data?.[0] ?? null;
+    },
+  });
 
   useEffect(() => {
     setSupported(isPushSupported());
@@ -33,13 +38,6 @@ export function PushSettings() {
       const sub = await reg?.pushManager.getSubscription();
       if (!sub) return;
       setEndpoint(sub.endpoint);
-      const { data } = await supabase
-        .from("push_subscriptions")
-        .select("reminder_local_time, enabled")
-        .eq("endpoint", sub.endpoint)
-        .maybeSingle();
-      if (data?.reminder_local_time) setReminderTime(data.reminder_local_time.slice(0, 5));
-      if (data?.enabled !== undefined && data.enabled !== null) setEnabled(data.enabled);
     })();
   }, [supported]);
 
@@ -69,11 +67,10 @@ export function PushSettings() {
       await saveSubscription({
         token: session.token,
         sub,
-        reminderLocalTime: reminderTime,
+        reminderLocalTime: null,
         enabled: true,
       });
       setEndpoint(sub.endpoint);
-      setEnabled(true);
       toast.success("Notifications enabled");
     } catch (e: any) {
       toast.error(e.message ?? "Failed");
@@ -96,32 +93,15 @@ export function PushSettings() {
     }
   }
 
-  async function saveTime() {
-    if (!session) return;
-    setLoading(true);
-    try {
-      const sub = await ensureSubscription();
-      await saveSubscription({
-        token: session.token,
-        sub,
-        reminderLocalTime: reminderTime,
-        enabled,
-      });
-      toast.success("Saved");
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-semibold">Notifications</h2>
           <p className="text-xs text-muted-foreground">
-            Daily reminder + admin broadcasts.
+            {settings?.reminder_time
+              ? `Daily reminder at ${String(settings.reminder_time).slice(0, 5)} + admin broadcasts.`
+              : "Daily reminder + admin broadcasts."}
           </p>
         </div>
         {endpoint ? (
@@ -136,22 +116,6 @@ export function PushSettings() {
           </Button>
         )}
       </div>
-      {endpoint && (
-        <div className="mt-3 flex items-end gap-2">
-          <div className="flex-1">
-            <Label htmlFor="rt">Daily reminder time</Label>
-            <Input
-              id="rt"
-              type="time"
-              value={reminderTime}
-              onChange={(e) => setReminderTime(e.target.value)}
-            />
-          </div>
-          <Button size="sm" onClick={saveTime} disabled={loading}>
-            Save
-          </Button>
-        </div>
-      )}
     </section>
   );
 }
