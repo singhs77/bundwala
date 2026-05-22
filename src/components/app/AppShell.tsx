@@ -6,8 +6,11 @@ import { Settings } from "lucide-react";
 export function AppShell({ children, title }: { children: React.ReactNode; title?: string }) {
   return (
     <MemberGate>
-      <div className="mx-auto flex min-h-[100dvh] max-w-xl flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
+      <div className="mx-auto flex min-h-[100svh] max-w-xl flex-col">
+        <header
+          className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-background/90 px-4 pb-3 backdrop-blur"
+          style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
+        >
           <div>
             <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
               Group Tracker
