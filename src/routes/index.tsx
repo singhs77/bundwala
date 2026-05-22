@@ -11,8 +11,6 @@ import {
   shiftMonth,
   startOfMonth,
   toISODate,
-  saturdaysInMonth,
-  addDays,
 } from "@/lib/week";
 import { applyCap, sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
@@ -23,6 +21,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { PushSettings } from "@/components/app/PushSettings";
+import { Announcements } from "@/components/app/Announcements";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -121,7 +120,7 @@ function Leaderboard() {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
     const month = daysOfMonth(anchor).map(toISODate);
     const result = new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
-    const monthSaturdays = saturdaysInMonth(anchor);
+    const pointsPerMacroLog = daysInMonth / 5;
     for (const m of data.members) {
       const gymCount = data.gym.filter(
         (g) => g.member_id === m.id && (g.status === "yes" || g.status === "home"),
@@ -142,18 +141,13 @@ function Leaderboard() {
         }
         return Number(s.hours ?? 0) >= 7;
       }).length;
-      // Macros: 1.25 pts per Sat→Fri week fully logged (calories on all 7 days), capped at 5
+      // Macros: (daysInMonth / 5) pts per logged day, capped at 5
       const macrosDates = new Set(
         data.macros
           .filter((x) => x.member_id === m.id && x.calories !== null)
           .map((x) => x.date),
       );
-      let macrosPts = 0;
-      for (const sat of monthSaturdays) {
-        const weekDates = Array.from({ length: 7 }, (_, i) => toISODate(addDays(sat, i)));
-        if (weekDates.every((d) => macrosDates.has(d))) macrosPts += 1.25;
-      }
-      macrosPts = Math.min(macrosPts, 5);
+      const macrosPts = Math.min(macrosDates.size * pointsPerMacroLog, 5);
       const scaleRule = (r?: Rule): Rule | undefined =>
         r ? { ...r, weekly_cap: Number(r.weekly_cap) * capScale } : r;
       const cat = {
@@ -175,7 +169,7 @@ function Leaderboard() {
       result.set(m.id, cat);
     }
     return result;
-  }, [data, ruleMap, anchor, capScale]);
+  }, [data, ruleMap, anchor, capScale, daysInMonth]);
 
   const teamTotals = useMemo(() => {
     if (!data) return new Map<string, number>();
@@ -233,6 +227,8 @@ function Leaderboard() {
       <div className="mb-3">
         <PushSettings />
       </div>
+
+      <Announcements />
 
       {dogshit && (
         <div className="mb-3 flex items-center justify-between rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3">
