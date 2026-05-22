@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { sendAdminBroadcast } from "@/lib/push.functions";
 import { Textarea } from "@/components/ui/textarea";
+import { Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — Group Tracker" }] }),
@@ -114,7 +115,194 @@ function AdminPage() {
       </section>
 
       <BroadcastSection />
+      <DailyReminderSection />
+      <AnnouncementsSection />
     </AppShell>
+  );
+}
+
+function DailyReminderSection() {
+  const qc = useQueryClient();
+  const { data: settings } = useQuery({
+    queryKey: ["notification_settings"],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_notification_settings");
+      return data?.[0] ?? null;
+    },
+  });
+
+  const [password, setPassword] = useState("");
+  const [time, setTime] = useState("20:00");
+  const [title, setTitle] = useState("Daily check-in");
+  const [body, setBody] = useState("Don't forget to log gym and macros today.");
+
+  useEffect(() => {
+    if (!settings) return;
+    if (settings.reminder_time) setTime(String(settings.reminder_time).slice(0, 5));
+    if (settings.reminder_title) setTitle(settings.reminder_title);
+    if (settings.reminder_body) setBody(settings.reminder_body);
+  }, [settings]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("admin_update_notification_settings", {
+        _password: password,
+        _time: time,
+        _title: title,
+        _body: body,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notification_settings"] });
+      toast.success("Saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold text-muted-foreground">Daily reminder</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        One global time + message sent to everyone with notifications enabled.
+      </p>
+      <div className="mt-3 space-y-2">
+        <div>
+          <Label htmlFor="dp">Admin password</Label>
+          <Input id="dp" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="dt">Time</Label>
+          <Input id="dt" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="dti">Title</Label>
+          <Input id="dti" maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="db">Message</Label>
+          <Textarea
+            id="db"
+            maxLength={300}
+            rows={3}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </div>
+        <Button
+          className="w-full"
+          onClick={() => save.mutate()}
+          disabled={save.isPending || !password || !title || !body || !time}
+        >
+          {save.isPending ? "Saving…" : "Save daily reminder"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function AnnouncementsSection() {
+  const qc = useQueryClient();
+  const { data: items } = useQuery({
+    queryKey: ["announcements"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("announcements")
+        .select("id, body, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      return data ?? [];
+    },
+  });
+
+  const [password, setPassword] = useState("");
+  const [body, setBody] = useState("");
+
+  const post = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("admin_post_announcement", {
+        _password: password,
+        _body: body,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setBody("");
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+      toast.success("Posted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("admin_delete_announcement", {
+        _password: password,
+        _id: id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+      toast.success("Removed");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold text-muted-foreground">Announcements</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Posted messages appear at the top of the Standings page for everyone.
+      </p>
+      <div className="mt-3 space-y-2">
+        <div>
+          <Label htmlFor="ap">Admin password</Label>
+          <Input id="ap" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="ab">New announcement</Label>
+          <Textarea
+            id="ab"
+            maxLength={1000}
+            rows={3}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Heads up team…"
+          />
+        </div>
+        <Button
+          className="w-full"
+          onClick={() => post.mutate()}
+          disabled={post.isPending || !password || !body.trim()}
+        >
+          {post.isPending ? "Posting…" : "Post announcement"}
+        </Button>
+      </div>
+      {items && items.length > 0 && (
+        <ul className="mt-4 divide-y divide-border">
+          {items.map((a) => (
+            <li key={a.id} className="flex items-start justify-between gap-2 py-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="whitespace-pre-wrap break-words">{a.body}</p>
+                <div className="mt-0.5 text-[10px] text-muted-foreground">
+                  {new Date(a.created_at).toLocaleString()}
+                </div>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => remove.mutate(a.id)}
+                disabled={!password || remove.isPending}
+                aria-label="Delete"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
