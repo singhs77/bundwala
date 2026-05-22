@@ -33,13 +33,12 @@ export const sendDueReminders = createServerFn({ method: "POST" }).handler(async
   const { data: subs, error } = await supabaseAdmin.rpc("list_due_reminders");
   if (error) throw new Error(error.message);
   if (!subs || subs.length === 0) return { sent: 0, failed: 0, due: 0 };
+  const first = subs[0] as { title?: string; body?: string };
   const result = await sendToSubs(subs, {
-    title: "Daily check-in",
-    body: "Don't forget to log gym and macros today.",
+    title: first.title || "Daily check-in",
+    body: first.body || "Don't forget to log gym and macros today.",
     url: "/",
   });
-  for (const s of subs) {
-    await supabaseAdmin.rpc("mark_reminder_sent", { _id: s.id });
-  }
+  await supabaseAdmin.rpc("mark_global_reminder_sent");
   return { ...result, due: subs.length };
 });
