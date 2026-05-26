@@ -117,7 +117,63 @@ function AdminPage() {
       <BroadcastSection />
       <DailyReminderSection />
       <AnnouncementsSection />
+      <ChangePasswordSection />
     </AppShell>
+  );
+}
+
+function ChangePasswordSection() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (next !== confirm) throw new Error("New passwords don't match");
+      if (next.length < 4) throw new Error("New password must be at least 4 characters");
+      const { error } = await supabase.rpc("admin_set_password", {
+        _current: current,
+        _new: next,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      toast.success("Admin password updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold text-muted-foreground">Change admin password</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Update the password used for all admin actions on this page.
+      </p>
+      <div className="mt-3 space-y-2">
+        <div>
+          <Label htmlFor="cp-cur">Current password</Label>
+          <Input id="cp-cur" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="cp-new">New password</Label>
+          <Input id="cp-new" type="password" value={next} onChange={(e) => setNext(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="cp-conf">Confirm new password</Label>
+          <Input id="cp-conf" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </div>
+        <Button
+          className="w-full"
+          onClick={() => save.mutate()}
+          disabled={save.isPending || !current || !next || !confirm}
+        >
+          {save.isPending ? "Saving…" : "Update password"}
+        </Button>
+      </div>
+    </section>
   );
 }
 
