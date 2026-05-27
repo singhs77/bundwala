@@ -291,9 +291,9 @@ function AnnouncementsSection() {
   });
 
   const remove = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, pw }: { id: string; pw: string }) => {
       const { error } = await supabase.rpc("admin_delete_announcement", {
-        _password: password,
+        _password: pw,
         _id: id,
       });
       if (error) throw error;
@@ -304,6 +304,19 @@ function AnnouncementsSection() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function handleDelete(id: string) {
+    let pw = password;
+    if (!pw) {
+      pw = window.prompt("Admin password") ?? "";
+    }
+    if (!pw) {
+      toast.error("Password required");
+      return;
+    }
+    if (!window.confirm("Delete this announcement?")) return;
+    remove.mutate({ id, pw });
+  }
 
   return (
     <section className="mt-6 rounded-2xl border border-border bg-card p-4">
@@ -348,8 +361,8 @@ function AnnouncementsSection() {
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={() => remove.mutate(a.id)}
-                disabled={!password || remove.isPending}
+                onClick={() => handleDelete(a.id)}
+                disabled={remove.isPending}
                 aria-label="Delete"
               >
                 <Trash2 className="h-4 w-4" />
