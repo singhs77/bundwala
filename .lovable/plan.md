@@ -1,38 +1,27 @@
-## Goal
+# Fix: App stuck on "Loading…"
 
-Resolve the `members_password_hash_public` finding. The previous fix used column-level GRANTs to hide `password_hash` and `has_password` from `anon`/`authenticated`, which works in practice — but the scanner still flags the table because the row-level policy is `USING (true)` and the sensitive column lives on the row. The robust fix is to physically move the secret out of `members`.
+## What's broken
 
-## Approach
+The `MemberGate` component shows "Loading…" until `useMembersQuery` resolves. That query (`SELECT id, name, avatar_url, team_id, has_password, teams(*) FROM members`) is run with the anon key and is now failing silently with a permission-denied error.
 
-Split credentials into a new private table that has **no GRANTs to anon/authenticated** and **no RLS policies**. Only `SECURITY DEFINER` RPCs (running as `postgres`) will touch it.
+Root cause: the earlier security migration ran `REVOKE SELECT (password_hash, has_password) ON public.members FROM anon, authenticated`. Combined with the follow-up migration that dropped and re-added `has_password` as a regular column, all SELECT privileges on `public.members` for `anon` and `authenticated` were wiped — verified via `has_table_privilege('anon', 'public.members', 'SELECT') = false`. The RLS policy `USING (true)` is irrelevant when the role has no grant at all; PostgREST returns 403 and React Query stays in the loading state.
 
-### Migration
+`password_hash` was already physically moved off `members` into the separate `member_credentials` table, so column-level revokes on `members` are no longer needed at all.
 
-1. Create `public.member_credentials`:
-   - `member_id uuid primary key references members(id) on delete cascade`
-   - `password_hash text`
-   - `updated_at timestamptz default now()`
-2. Copy existing hashes: `INSERT ... SELECT id, password_hash FROM members WHERE password_hash IS NOT NULL`.
-3. `GRANT ALL ON public.member_credentials TO service_role;` — no grants to anon/authenticated. RLS enabled, no policies.
-4. Recreate a `has_password` computed view OR keep `has_password` as a generated column on `members` derived from a join — simplest: add a generated boolean is not possible across tables, so instead:
-   - Drop `members.password_hash` and `members.has_password` columns.
-   - Expose `has_password` via the existing public read on `members` by adding a new boolean column `has_password` maintained by the RPCs (already present today — keep it, just stop storing the hash here). The scanner's complaint is about the hash, not the boolean flag.
-5. Update the four affected `SECURITY DEFINER` functions to read/write `member_credentials` instead of `members.password_hash`:
-   - `member_verify_password`
-   - `member_set_password`
-   - (no other functions touch the hash)
-   Each function continues to update `members.has_password` for the public read path.
+## Fix
 
-### App code
+Single migration:
 
-No client changes required — all password flows already go through `member_verify_password` / `member_set_password` RPCs. The `MemberPicker` reads `has_password` from `members`, which still works.
+```sql
+GRANT SELECT ON public.members TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.members TO authenticated;
+GRANT ALL ON public.members TO service_role;
+```
 
-### Verification
+This restores the public scoreboard read path. `password_hash` does not exist on this table anymore, and `member_credentials` remains locked down (no anon/authenticated grants), so the original security finding stays fixed.
 
-- Confirm `SELECT password_hash FROM members` fails (column gone).
-- Confirm login + set-password flows still work in the preview.
-- Re-run the security scan and mark the finding fixed.
+## Verify
 
-## Out of scope
-
-The other three findings currently shown (admin page direct writes, `delete_push_subscription_by_endpoint` unauth, `send-reminders` unauth) — happy to tackle those next in a separate pass if you want.
+1. Reload the preview — the "Who are you?" picker should render member tiles instead of "Loading…".
+2. `psql -c "SELECT has_table_privilege('anon', 'public.members', 'SELECT')"` returns `t`.
+3. Re-run the security scan — `members_password_hash_public` should remain resolved (column no longer exists).
