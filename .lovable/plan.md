@@ -1,49 +1,38 @@
 ## Goal
 
-Import historical **Sleep Log** and **Deep Work Log** tabs from your Google Sheet into the app's `sleep_logs` and `deep_work` tables so existing sheet users see their history when they sign in.
+Resolve the `members_password_hash_public` finding. The previous fix used column-level GRANTs to hide `password_hash` and `has_password` from `anon`/`authenticated`, which works in practice — but the scanner still flags the table because the row-level policy is `USING (true)` and the sensitive column lives on the row. The robust fix is to physically move the secret out of `members`.
 
-## How you give me the data
+## Approach
 
-Export the Google Sheet as `.xlsx` and upload it here. I'll parse the two tabs locally with DuckDB/pandas — no Google connector or live link.
+Split credentials into a new private table that has **no GRANTs to anon/authenticated** and **no RLS policies**. Only `SECURITY DEFINER` RPCs (running as `postgres`) will touch it.
 
-## Member matching
+### Migration
 
-- Build a list of distinct member names found in the Sleep and Deep Work tabs.
-- Look them up in `public.members` by name (case-insensitive, trimmed).
-- **If any name is missing, I stop and show you the unmatched list** so you can either rename them in the sheet, create the missing members in the app first, or give me a name → member mapping. Nothing gets inserted until every name resolves.
+1. Create `public.member_credentials`:
+   - `member_id uuid primary key references members(id) on delete cascade`
+   - `password_hash text`
+   - `updated_at timestamptz default now()`
+2. Copy existing hashes: `INSERT ... SELECT id, password_hash FROM members WHERE password_hash IS NOT NULL`.
+3. `GRANT ALL ON public.member_credentials TO service_role;` — no grants to anon/authenticated. RLS enabled, no policies.
+4. Recreate a `has_password` computed view OR keep `has_password` as a generated column on `members` derived from a join — simplest: add a generated boolean is not possible across tables, so instead:
+   - Drop `members.password_hash` and `members.has_password` columns.
+   - Expose `has_password` via the existing public read on `members` by adding a new boolean column `has_password` maintained by the RPCs (already present today — keep it, just stop storing the hash here). The scanner's complaint is about the hash, not the boolean flag.
+5. Update the four affected `SECURITY DEFINER` functions to read/write `member_credentials` instead of `members.password_hash`:
+   - `member_verify_password`
+   - `member_set_password`
+   - (no other functions touch the hash)
+   Each function continues to update `members.has_password` for the public read path.
 
-## Conflict rule
+### App code
 
-For every `(member, date)` pair from the sheet, only insert if no row already exists in the target table. Existing app data is never touched. Re-runnable safely.
+No client changes required — all password flows already go through `member_verify_password` / `member_set_password` RPCs. The `MemberPicker` reads `has_password` from `members`, which still works.
 
-## "Missing day = None"
+### Verification
 
-I don't insert rows for blank days. The app already renders missing days as no entry / no score, which is the "None" behavior you want. No empty placeholder rows needed.
+- Confirm `SELECT password_hash FROM members` fails (column gone).
+- Confirm login + set-password flows still work in the preview.
+- Re-run the security scan and mark the finding fixed.
 
-## Per-tab mapping
+## Out of scope
 
-**Sleep Log → `sleep_logs`**
-- Columns expected per row: member name, date, and at least one of: hours, sleep time, wake time.
-- If only sleep/wake times are present, I'll compute `hours` (handling overnight wraps).
-- If only hours are present, sleep_time/wake_time stay null.
-- Insert via the existing `INSERT ... ON CONFLICT (member_id, date) DO NOTHING` shape.
-
-**Deep Work Log → `deep_work`**
-- Columns expected per row: member name, date, topic (optional), minutes, learnings (optional), notes (optional).
-- One sheet row = one `deep_work` entry. (Unlike sleep, this table allows multiple per day, so "skip if exists" applies per-date: I'll skip the whole date for a member if they already have any deep_work row that day, to avoid double-importing.)
-- `started_at` / `finished_at` synthesized from `date` + `minutes` (end of day backed out by minutes), same pattern as `log_deep_work` RPC.
-
-## What I'll do once you upload
-
-1. Open the `.xlsx`, dump the two tabs' headers and a few sample rows back to you so we confirm the column mapping before any writes.
-2. Extract distinct names; verify every name maps to a `members.id`. If not, stop and show the gaps.
-3. Generate one SQL insert batch per tab (parameterized, chunked) and run it via the insert tool. Skip-if-exists logic is in the SQL itself.
-4. Report: rows inserted per tab, rows skipped as duplicates, date range covered, per-member counts.
-
-## Out of scope (per your call)
-
-- Scoreboard tab (derived from logs — will populate automatically).
-- Gym tab.
-- Avg Weekly Macros tab.
-
-We can add those later with the same flow if you want.
+The other three findings currently shown (admin page direct writes, `delete_push_subscription_by_endpoint` unauth, `send-reminders` unauth) — happy to tackle those next in a separate pass if you want.
