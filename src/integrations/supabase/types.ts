@@ -254,6 +254,32 @@ export type Database = {
           },
         ]
       }
+      member_credentials: {
+        Row: {
+          member_id: string
+          password_hash: string
+          updated_at: string
+        }
+        Insert: {
+          member_id: string
+          password_hash: string
+          updated_at?: string
+        }
+        Update: {
+          member_id?: string
+          password_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_credentials_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_sessions: {
         Row: {
           created_at: string
@@ -287,28 +313,25 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
-          has_password: boolean | null
+          has_password: boolean
           id: string
           name: string
-          password_hash: string | null
           team_id: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
-          has_password?: boolean | null
+          has_password?: boolean
           id?: string
           name: string
-          password_hash?: string | null
           team_id?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
-          has_password?: boolean | null
+          has_password?: boolean
           id?: string
           name?: string
-          password_hash?: string | null
           team_id?: string | null
         }
         Relationships: [
