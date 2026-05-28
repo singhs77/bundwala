@@ -26,12 +26,23 @@ function hoursBetween(sleep: string, wake: string): number {
   return Math.round((diff / 60) * 100) / 100;
 }
 
+type Member = { id: string; name: string };
+type SleepLog = {
+  id: string;
+  member_id: string;
+  date: string;
+  sleep_time: string | null;
+  wake_time: string | null;
+  hours: number | null;
+};
+
 function SleepPage() {
   const me = useMe();
   const session = useSession();
   const qc = useQueryClient();
   const today = toISODate(new Date());
   const yesterday = toISODate(new Date(Date.now() - 86400000));
+  const editableDates = new Set([today, yesterday]);
   const [selectedDate, setSelectedDate] = useState(today);
   const [sleepTime, setSleepTime] = useState("");
   const [wakeTime, setWakeTime] = useState("");
@@ -73,9 +84,34 @@ function SleepPage() {
     enabled: !!me,
   });
 
+  const { data: groupRows } = useQuery({
+    queryKey: ["sleep-group"],
+    queryFn: async () => {
+      const { data: members, error: membersError } = await supabase
+        .from("members")
+        .select("id,name");
+      if (membersError) throw membersError;
+
+      const { data: logs, error: logsError } = await supabase
+        .from("sleep_logs")
+        .select("id,member_id,date,sleep_time,wake_time,hours")
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (logsError) throw logsError;
+
+      const names = new Map((members ?? []).map((m: Member) => [m.id, m.name]));
+      return (logs ?? []).map((log: SleepLog) => ({
+        ...log,
+        memberName: names.get(log.member_id) ?? "Unknown",
+      }));
+    },
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       if (!session) throw new Error("Not signed in");
+      if (!editableDates.has(selectedDate)) throw new Error("Sleep can only be logged for today or yesterday");
       const hours = hoursBetween(sleepTime, wakeTime);
       const { error } = await supabase.rpc("log_sleep", {
         _token: session.token,
@@ -89,6 +125,7 @@ function SleepPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sleep-today"] });
       qc.invalidateQueries({ queryKey: ["sleep-recent"] });
+      qc.invalidateQueries({ queryKey: ["sleep-group"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
@@ -98,6 +135,7 @@ function SleepPage() {
   const del = useMutation({
     mutationFn: async (date: string) => {
       if (!session) throw new Error("Not signed in");
+      if (!editableDates.has(date)) throw new Error("Sleep can only be deleted for today or yesterday");
       const { error } = await supabase.rpc("delete_sleep", {
         _token: session.token,
         _date: date,
@@ -107,6 +145,7 @@ function SleepPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sleep-today"] });
       qc.invalidateQueries({ queryKey: ["sleep-recent"] });
+      qc.invalidateQueries({ queryKey: ["sleep-group"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Deleted");
     },
@@ -202,7 +241,7 @@ function SleepPage() {
                 onClick={() => {
                   if (confirm(`Delete sleep log for ${r.date}?`)) del.mutate(r.date);
                 }}
-                disabled={del.isPending}
+                disabled={del.isPending || !editableDates.has(r.date)}
                 className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                 aria-label="Delete entry"
               >
@@ -210,6 +249,26 @@ function SleepPage() {
               </button>
             </li>
           )) : <li className="p-4 text-center text-sm text-muted-foreground">No entries yet.</li>}
+        </ul>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Everyone's sleep logs</h3>
+        <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
+          {groupRows?.length ? groupRows.map((r) => (
+            <li key={r.id} className="grid grid-cols-[1fr_auto] gap-2 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <div className="truncate font-medium">{r.memberName}</div>
+                <div className="text-xs text-muted-foreground">{r.date}</div>
+              </div>
+              <div className="text-right">
+                <div className="font-semibold tabular-nums">{Number(r.hours ?? 0).toFixed(1)}h</div>
+                <div className="text-xs text-muted-foreground">
+                  {r.sleep_time?.slice(0, 5)} â†’ {r.wake_time?.slice(0, 5)}
+                </div>
+              </div>
+            </li>
+          )) : <li className="p-4 text-center text-sm text-muted-foreground">No sleep logs yet.</li>}
         </ul>
       </section>
     </AppShell>

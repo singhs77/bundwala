@@ -17,6 +17,16 @@ export const Route = createFileRoute("/macros")({
 
 const FIELDS = ["calories", "protein", "carbs", "fat", "sugar", "water"] as const;
 type Field = (typeof FIELDS)[number];
+type Member = { id: string; name: string };
+type MacrosLog = {
+  id: string;
+  member_id: string;
+  date: string;
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+};
 
 function MacrosPage() {
   const me = useMe();
@@ -60,6 +70,30 @@ function MacrosPage() {
     enabled: !!me,
   });
 
+  const { data: groupRows } = useQuery({
+    queryKey: ["macros-group"],
+    queryFn: async () => {
+      const { data: members, error: membersError } = await supabase
+        .from("members")
+        .select("id,name");
+      if (membersError) throw membersError;
+
+      const { data: logs, error: logsError } = await supabase
+        .from("macros_logs")
+        .select("id,member_id,date,calories,protein,carbs,fat")
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (logsError) throw logsError;
+
+      const names = new Map((members ?? []).map((m: Member) => [m.id, m.name]));
+      return (logs ?? []).map((log: MacrosLog) => ({
+        ...log,
+        memberName: names.get(log.member_id) ?? "Unknown",
+      }));
+    },
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       if (!session) throw new Error("Not signed in");
@@ -84,6 +118,7 @@ function MacrosPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["macros-today"] });
       qc.invalidateQueries({ queryKey: ["macros-week"] });
+      qc.invalidateQueries({ queryKey: ["macros-group"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
@@ -146,6 +181,28 @@ function MacrosPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="mt-6">
+        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Everyone's macro logs</h3>
+        <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
+          {groupRows?.length ? groupRows.map((r) => (
+            <li key={r.id} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <div className="truncate font-medium">{r.memberName}</div>
+                <div className="text-xs text-muted-foreground">{r.date}</div>
+              </div>
+              <div className="text-right text-xs text-muted-foreground">
+                <div className="text-sm font-semibold text-foreground tabular-nums">
+                  {r.calories ?? "-"} cal
+                </div>
+                <div className="tabular-nums">
+                  P {r.protein ?? "-"} / C {r.carbs ?? "-"} / F {r.fat ?? "-"}
+                </div>
+              </div>
+            </li>
+          )) : <li className="p-4 text-center text-sm text-muted-foreground">No macro logs yet.</li>}
+        </ul>
       </section>
     </AppShell>
   );
