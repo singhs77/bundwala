@@ -77,20 +77,6 @@ function SleepPage() {
     setWakeTime(today_log?.wake_time?.slice(0, 5) ?? "");
   }, [today_log, selectedDate]);
 
-  const { data: recent } = useQuery({
-    queryKey: ["sleep-recent", me],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("sleep_logs")
-        .select("*")
-        .eq("member_id", me!)
-        .order("date", { ascending: false })
-        .limit(7);
-      return data ?? [];
-    },
-    enabled: !!me,
-  });
-
   const { data: groupRows } = useQuery({
     queryKey: ["sleep-month"],
     queryFn: async () => {
