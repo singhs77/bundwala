@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toISODate, startOfMonth, endOfMonth } from "@/lib/week";
 import { toast } from "sonner";
 import { withinTimeBuffer } from "@/lib/score";
-import { Trash2 } from "lucide-react";
+
 import { MemberFeed } from "@/components/app/MemberFeed";
 
 export const Route = createFileRoute("/sleep")({
