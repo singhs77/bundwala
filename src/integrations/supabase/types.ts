@@ -344,6 +344,36 @@ export type Database = {
           },
         ]
       }
+      monthly_snapshots: {
+        Row: {
+          deep_work: number
+          gym: number
+          macros: number
+          member_id: string
+          month: string
+          sleep: number
+          updated_at: string
+        }
+        Insert: {
+          deep_work?: number
+          gym?: number
+          macros?: number
+          member_id: string
+          month: string
+          sleep?: number
+          updated_at?: string
+        }
+        Update: {
+          deep_work?: number
+          gym?: number
+          macros?: number
+          member_id?: string
+          month?: string
+          sleep?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_settings: {
         Row: {
           id: number
