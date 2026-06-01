@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { endOfWeek, startOfWeek, toISODate } from "@/lib/week";
+import { endOfWeek, startOfWeek, startOfMonth, endOfMonth, toISODate } from "@/lib/week";
 import { toast } from "sonner";
+import { MemberFeed } from "@/components/app/MemberFeed";
 
 export const Route = createFileRoute("/macros")({
   head: () => ({ meta: [{ title: "Macros — Group Tracker" }] }),
@@ -71,26 +72,23 @@ function MacrosPage() {
   });
 
   const { data: groupRows } = useQuery({
-    queryKey: ["macros-group"],
+    queryKey: ["macros-month"],
     queryFn: async () => {
-      const { data: members, error: membersError } = await supabase
-        .from("members")
-        .select("id,name");
-      if (membersError) throw membersError;
-
-      const { data: logs, error: logsError } = await supabase
-        .from("macros_logs")
-        .select("id,member_id,date,calories,protein,carbs,fat")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(30);
-      if (logsError) throw logsError;
-
-      const names = new Map((members ?? []).map((m: Member) => [m.id, m.name]));
-      return (logs ?? []).map((log: MacrosLog) => ({
-        ...log,
-        memberName: names.get(log.member_id) ?? "Unknown",
-      }));
+      const ms = toISODate(startOfMonth(new Date()));
+      const me_ = toISODate(endOfMonth(new Date()));
+      const [{ data: members }, { data: logs }] = await Promise.all([
+        supabase.from("members").select("id,name"),
+        supabase
+          .from("macros_logs")
+          .select("id,member_id,date,calories,protein,carbs,fat")
+          .gte("date", ms)
+          .lte("date", me_)
+          .order("date", { ascending: false }),
+      ]);
+      return {
+        members: (members ?? []) as Member[],
+        logs: (logs ?? []) as MacrosLog[],
+      };
     },
   });
 
@@ -118,7 +116,7 @@ function MacrosPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["macros-today"] });
       qc.invalidateQueries({ queryKey: ["macros-week"] });
-      qc.invalidateQueries({ queryKey: ["macros-group"] });
+      qc.invalidateQueries({ queryKey: ["macros-month"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
@@ -130,6 +128,39 @@ function MacrosPage() {
     const vals = (weekRows ?? []).map((r: any) => r[f]).filter((v: any) => v != null) as number[];
     avgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
   });
+
+  const logsByMember = useMemo(() => {
+    const m = new Map<string, MacrosLog[]>();
+    for (const l of groupRows?.logs ?? []) {
+      if (!m.has(l.member_id)) m.set(l.member_id, []);
+      m.get(l.member_id)!.push(l);
+    }
+    return m;
+  }, [groupRows]);
+
+  function macrosRow(log: MacrosLog | undefined) {
+    if (!log || log.calories == null) {
+      return (
+        <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
+          Not logged
+        </span>
+      );
+    }
+    const hit = log.calories != null;
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold tabular-nums">{log.calories} cal</span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          P {log.protein ?? "-"} / C {log.carbs ?? "-"} / F {log.fat ?? "-"}
+        </span>
+        {hit && (
+          <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+            ✓ Hit
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <AppShell title="Macros">
@@ -183,27 +214,32 @@ function MacrosPage() {
         </div>
       </section>
 
-      <section className="mt-6">
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Everyone's macro logs</h3>
-        <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
-          {groupRows?.length ? groupRows.map((r) => (
-            <li key={r.id} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <div className="truncate font-medium">{r.memberName}</div>
-                <div className="text-xs text-muted-foreground">{r.date}</div>
-              </div>
-              <div className="text-right text-xs text-muted-foreground">
-                <div className="text-sm font-semibold text-foreground tabular-nums">
-                  {r.calories ?? "-"} cal
-                </div>
-                <div className="tabular-nums">
-                  P {r.protein ?? "-"} / C {r.carbs ?? "-"} / F {r.fat ?? "-"}
-                </div>
-              </div>
-            </li>
-          )) : <li className="p-4 text-center text-sm text-muted-foreground">No macro logs yet.</li>}
-        </ul>
-      </section>
+      <MemberFeed
+        title="Everyone's macro logs"
+        members={groupRows?.members ?? []}
+        renderToday={(mid) => {
+          const log = logsByMember.get(mid)?.find((l) => l.date === today);
+          return macrosRow(log);
+        }}
+        renderHistory={(mid) => {
+          const rows = logsByMember.get(mid) ?? [];
+          if (!rows.length)
+            return <p className="text-sm text-muted-foreground">No entries this month.</p>;
+          return (
+            <ul className="divide-y divide-border">
+              {rows.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
+                >
+                  <span className="text-muted-foreground">{r.date}</span>
+                  {macrosRow(r)}
+                </li>
+              ))}
+            </ul>
+          );
+        }}
+      />
     </AppShell>
   );
 }

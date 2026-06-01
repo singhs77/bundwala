@@ -1,16 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toISODate } from "@/lib/week";
+import { toISODate, startOfMonth, endOfMonth } from "@/lib/week";
 import { toast } from "sonner";
 import { withinTimeBuffer } from "@/lib/score";
 import { Trash2 } from "lucide-react";
+import { MemberFeed } from "@/components/app/MemberFeed";
 
 export const Route = createFileRoute("/sleep")({
   head: () => ({ meta: [{ title: "Sleep — Group Tracker" }] }),
@@ -34,6 +35,12 @@ type SleepLog = {
   sleep_time: string | null;
   wake_time: string | null;
   hours: number | null;
+  free_day?: boolean | null;
+};
+type SleepTarget = {
+  member_id: string;
+  target_sleep: string | null;
+  target_wake: string | null;
 };
 
 function SleepPage() {
@@ -85,26 +92,28 @@ function SleepPage() {
   });
 
   const { data: groupRows } = useQuery({
-    queryKey: ["sleep-group"],
+    queryKey: ["sleep-month"],
     queryFn: async () => {
-      const { data: members, error: membersError } = await supabase
-        .from("members")
-        .select("id,name");
-      if (membersError) throw membersError;
-
-      const { data: logs, error: logsError } = await supabase
-        .from("sleep_logs")
-        .select("id,member_id,date,sleep_time,wake_time,hours")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(30);
-      if (logsError) throw logsError;
-
-      const names = new Map((members ?? []).map((m: Member) => [m.id, m.name]));
-      return (logs ?? []).map((log: SleepLog) => ({
-        ...log,
-        memberName: names.get(log.member_id) ?? "Unknown",
-      }));
+      const ms = toISODate(startOfMonth(new Date()));
+      const me_ = toISODate(endOfMonth(new Date()));
+      const [{ data: members }, { data: logs }, { data: targets }, { data: freeDays }] =
+        await Promise.all([
+          supabase.from("members").select("id,name"),
+          supabase
+            .from("sleep_logs")
+            .select("id,member_id,date,sleep_time,wake_time,hours,free_day")
+            .gte("date", ms)
+            .lte("date", me_)
+            .order("date", { ascending: false }),
+          supabase.from("sleep_targets").select("member_id,target_sleep,target_wake"),
+          supabase.from("free_days").select("date").gte("date", ms).lte("date", me_),
+        ]);
+      return {
+        members: (members ?? []) as Member[],
+        logs: (logs ?? []) as SleepLog[],
+        targets: (targets ?? []) as SleepTarget[],
+        freeDays: new Set((freeDays ?? []).map((f: { date: string }) => f.date)),
+      };
     },
   });
 
@@ -125,7 +134,7 @@ function SleepPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sleep-today"] });
       qc.invalidateQueries({ queryKey: ["sleep-recent"] });
-      qc.invalidateQueries({ queryKey: ["sleep-group"] });
+      qc.invalidateQueries({ queryKey: ["sleep-month"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
@@ -145,7 +154,7 @@ function SleepPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sleep-today"] });
       qc.invalidateQueries({ queryKey: ["sleep-recent"] });
-      qc.invalidateQueries({ queryKey: ["sleep-group"] });
+      qc.invalidateQueries({ queryKey: ["sleep-month"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Deleted");
     },
@@ -160,6 +169,63 @@ function SleepPage() {
     ? withinTimeBuffer(wakeTime, target.target_wake, 90)
     : null;
   const onTarget = sleepOk === true && wakeOk === true;
+
+  const logsByMember = useMemo(() => {
+    const m = new Map<string, SleepLog[]>();
+    for (const l of groupRows?.logs ?? []) {
+      if (!m.has(l.member_id)) m.set(l.member_id, []);
+      m.get(l.member_id)!.push(l);
+    }
+    return m;
+  }, [groupRows]);
+
+  const targetByMember = useMemo(() => {
+    const m = new Map<string, SleepTarget>();
+    for (const t of groupRows?.targets ?? []) m.set(t.member_id, t);
+    return m;
+  }, [groupRows]);
+
+  function sleepHit(log: SleepLog | undefined, memberId: string): boolean {
+    if (!log) return false;
+    if (log.free_day) return true;
+    if (groupRows?.freeDays.has(log.date)) return true;
+    const t = targetByMember.get(memberId);
+    if (t?.target_sleep && t?.target_wake) {
+      return (
+        withinTimeBuffer(log.sleep_time, t.target_sleep, 90) &&
+        withinTimeBuffer(log.wake_time, t.target_wake, 90)
+      );
+    }
+    return Number(log.hours ?? 0) >= 7;
+  }
+
+  function sleepRow(log: SleepLog | undefined, memberId: string) {
+    if (!log) {
+      return (
+        <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
+          Not logged
+        </span>
+      );
+    }
+    const hit = sleepHit(log, memberId);
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold tabular-nums">
+          {Number(log.hours ?? 0).toFixed(1)}h
+        </span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {log.sleep_time?.slice(0, 5)} → {log.wake_time?.slice(0, 5)}
+        </span>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            hit ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+          }`}
+        >
+          {hit ? "✓ Hit" : "✗ Miss"}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <AppShell title="Sleep">
@@ -252,25 +318,32 @@ function SleepPage() {
         </ul>
       </section>
 
-      <section className="mt-6">
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Everyone's sleep logs</h3>
-        <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
-          {groupRows?.length ? groupRows.map((r) => (
-            <li key={r.id} className="grid grid-cols-[1fr_auto] gap-2 px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <div className="truncate font-medium">{r.memberName}</div>
-                <div className="text-xs text-muted-foreground">{r.date}</div>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold tabular-nums">{Number(r.hours ?? 0).toFixed(1)}h</div>
-                <div className="text-xs text-muted-foreground">
-                  {r.sleep_time?.slice(0, 5)} â†’ {r.wake_time?.slice(0, 5)}
-                </div>
-              </div>
-            </li>
-          )) : <li className="p-4 text-center text-sm text-muted-foreground">No sleep logs yet.</li>}
-        </ul>
-      </section>
+      <MemberFeed
+        title="Everyone's sleep logs"
+        members={groupRows?.members ?? []}
+        renderToday={(mid) => {
+          const log = logsByMember.get(mid)?.find((l) => l.date === today);
+          return sleepRow(log, mid);
+        }}
+        renderHistory={(mid) => {
+          const rows = logsByMember.get(mid) ?? [];
+          if (!rows.length)
+            return <p className="text-sm text-muted-foreground">No entries this month.</p>;
+          return (
+            <ul className="divide-y divide-border">
+              {rows.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
+                >
+                  <span className="text-muted-foreground">{r.date}</span>
+                  {sleepRow(r, mid)}
+                </li>
+              ))}
+            </ul>
+          );
+        }}
+      />
     </AppShell>
   );
 }

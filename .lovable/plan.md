@@ -1,27 +1,49 @@
-# Fix: App stuck on "Loading…"
+## Goal
 
-## What's broken
+1. Replace the flat "Everyone's logs" lists at the bottom of **Gym**, **Sleep**, and **Macros** with a Deep-Work–style person-filtered view that shows today's status by default and expands to full history.
+2. Make the **Standings** leaderboard a true per-month score: June shows only June, May only May, and there are no carry-over baselines.
 
-The `MemberGate` component shows "Loading…" until `useMembersQuery` resolves. That query (`SELECT id, name, avatar_url, team_id, has_password, teams(*) FROM members`) is run with the anon key and is now failing silently with a permission-denied error.
+## 1. Per-category social view (Gym / Sleep / Macros)
 
-Root cause: the earlier security migration ran `REVOKE SELECT (password_hash, has_password) ON public.members FROM anon, authenticated`. Combined with the follow-up migration that dropped and re-added `has_password` as a regular column, all SELECT privileges on `public.members` for `anon` and `authenticated` were wiped — verified via `has_table_privilege('anon', 'public.members', 'SELECT') = false`. The RLS policy `USING (true)` is irrelevant when the role has no grant at all; PostgREST returns 403 and React Query stays in the loading state.
+Pattern, mirroring `src/routes/deep-work.tsx`:
 
-`password_hash` was already physically moved off `members` into the separate `member_credentials` table, so column-level revokes on `members` are no longer needed at all.
+- Add a `Select` person filter above the everyone-list. Options: **Everyone** + each member.
+- Default view (today-only): one card per member showing **today's** status for that category.
+  - **Gym**: Hit it / Home / Skipped pill (or "Not logged yet" muted).
+  - **Sleep**: hours + sleep→wake times, plus a ✓/✗ pill for whether the target/7h bar was hit (use the same logic as `index.tsx`: free day, within ±90 min of target, or ≥7h fallback).
+  - **Macros**: calories + P/C/F line (or "Not logged yet").
+- Each card has a chevron / "Show history" toggle. Expanded, it lists that member's logs for the current month (newest first) with the same per-day status pill.
+- When the filter is set to a specific person, auto-expand their card and hide everyone else.
+- Keep the existing "log your own entry" sections at the top of each page unchanged. Only the bottom "Everyone's …" section changes.
 
-## Fix
+Data:
+- Fetch `members(id, name)` once.
+- Fetch the category logs for the current month (`gym_logs` / `sleep_logs` / `macros_logs`) for all members in a single query, instead of the current `.limit(30)` flat fetch.
+- Derive "today's row" and "history rows" per member in memory.
 
-Single migration:
+No DB or RPC changes — all existing tables and policies stay as-is.
 
-```sql
-GRANT SELECT ON public.members TO anon, authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.members TO authenticated;
-GRANT ALL ON public.members TO service_role;
-```
+## 2. Monthly score reset on Standings
 
-This restores the public scoreboard read path. `password_hash` does not exist on this table anymore, and `member_credentials` remains locked down (no anon/authenticated grants), so the original security finding stays fixed.
+In `src/routes/index.tsx`:
 
-## Verify
+- Remove the `baseline_scores` addition from the per-member score computation. Each month's total is built purely from that month's `gym_logs`, `deep_work`, `sleep_logs`, `macros_logs`, and `free_days` (which are already filtered by `ws`/`we`).
+- Drop the `baselines` fetch from the leaderboard query.
+- "Most Dogshit Player" automatically becomes month-scoped too (it already reads from `scores`).
+- Navigating to a previous month via the existing chevrons will now show only that month's points; the current month starts everyone at 0 on day 1.
 
-1. Reload the preview — the "Who are you?" picker should render member tiles instead of "Loading…".
-2. `psql -c "SELECT has_table_privilege('anon', 'public.members', 'SELECT')"` returns `t`.
-3. Re-run the security scan — `members_password_hash_public` should remain resolved (column no longer exists).
+No migration needed. `baseline_scores` table is left in place but unused by the leaderboard (admin tools that write to it, if any, are not touched).
+
+## Files changed
+
+- `src/routes/gym.tsx` — replace bottom section with filterable per-member today + expandable history.
+- `src/routes/sleep.tsx` — same pattern; reuse `withinTimeBuffer` for the hit/miss pill.
+- `src/routes/macros.tsx` — same pattern.
+- `src/routes/index.tsx` — drop baseline addition and the baselines fetch.
+- (Optional) extract a small shared `MemberLogList` component into `src/components/app/` if the three pages end up duplicating the same scaffolding.
+
+## Out of scope
+
+- No changes to logging RPCs, scoring rules, or DB schema.
+- Deep Work tab stays as-is.
+- `baseline_scores` table is not dropped (kept for admin tooling); it's just no longer added into standings.
