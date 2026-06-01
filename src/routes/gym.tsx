@@ -127,7 +127,7 @@ function GymPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gym-logs"] });
-      qc.invalidateQueries({ queryKey: ["gym-group"] });
+      qc.invalidateQueries({ queryKey: ["gym-month"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
