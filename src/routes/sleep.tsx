@@ -127,25 +127,6 @@ function SleepPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const del = useMutation({
-    mutationFn: async (date: string) => {
-      if (!session) throw new Error("Not signed in");
-      if (!editableDates.has(date)) throw new Error("Sleep can only be deleted for today or yesterday");
-      const { error } = await supabase.rpc("delete_sleep", {
-        _token: session.token,
-        _date: date,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sleep-today"] });
-      qc.invalidateQueries({ queryKey: ["sleep-recent"] });
-      qc.invalidateQueries({ queryKey: ["sleep-month"] });
-      qc.invalidateQueries({ queryKey: ["leaderboard"] });
-      toast.success("Deleted");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const hours = hoursBetween(sleepTime, wakeTime);
   const sleepOk = target?.target_sleep
