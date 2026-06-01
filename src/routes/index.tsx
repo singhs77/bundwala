@@ -66,7 +66,7 @@ function Leaderboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", ws, we],
     queryFn: async () => {
-      const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets] =
+      const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets, snapshots] =
         await Promise.all([
           supabase.from("teams").select("*").order("sort_order"),
           supabase.from("members").select("id, name, team_id"),
@@ -93,6 +93,10 @@ function Leaderboard() {
             .lte("date", we),
           supabase.from("free_days").select("date").gte("date", ws).lte("date", we),
           supabase.from("sleep_targets").select("*"),
+          supabase
+            .from("monthly_snapshots")
+            .select("member_id,gym,deep_work,sleep,macros")
+            .eq("month", ws),
         ]);
       return {
         teams: teams.data ?? [],
@@ -104,6 +108,7 @@ function Leaderboard() {
         macros: macros.data ?? [],
         freeDays: (freeDays.data ?? []).map((f) => f.date),
         targets: targets.data ?? [],
+        snapshots: snapshots.data ?? [],
       };
     },
   });
@@ -116,8 +121,26 @@ function Leaderboard() {
 
   const scores = useMemo(() => {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
-    const month = daysOfMonth(anchor).map(toISODate);
     const result = new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
+    if (data.snapshots.length > 0) {
+      const snapMap = new Map(data.snapshots.map((s: any) => [s.member_id, s]));
+      for (const m of data.members) {
+        const s: any = snapMap.get(m.id);
+        const cat = s
+          ? {
+              gym: Number(s.gym),
+              deep_work: Number(s.deep_work),
+              sleep: Number(s.sleep),
+              macros: Number(s.macros),
+              total: 0,
+            }
+          : { gym: 0, deep_work: 0, sleep: 0, macros: 0, total: 0 };
+        cat.total = sumTotal(cat);
+        result.set(m.id, cat);
+      }
+      return result;
+    }
+    const month = daysOfMonth(anchor).map(toISODate);
     const pointsPerMacroLog = daysInMonth / 5;
     for (const m of data.members) {
       const gymCount = data.gym.filter(
