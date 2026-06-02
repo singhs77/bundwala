@@ -110,7 +110,7 @@ function AdminPage() {
         />
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-4">
+      <section className="mt-6 rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold text-muted-foreground">Scoring rules</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Points per qualifying entry × weekly cap per category.
