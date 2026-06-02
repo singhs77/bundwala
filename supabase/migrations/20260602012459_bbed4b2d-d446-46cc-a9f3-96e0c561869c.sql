@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.delete_push_subscription_by_endpoint(text) FROM anon, authenticated;
