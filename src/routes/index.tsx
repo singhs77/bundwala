@@ -141,7 +141,7 @@ function Leaderboard() {
       return result;
     }
     const month = daysOfMonth(anchor).map(toISODate);
-    const pointsPerMacroLog = daysInMonth / 5;
+    const pointsPerDay = 5 / daysInMonth;
     for (const m of data.members) {
       const gymCount = data.gym.filter(
         (g) => g.member_id === m.id && (g.status === "yes" || g.status === "home"),
@@ -168,12 +168,12 @@ function Leaderboard() {
           .filter((x) => x.member_id === m.id && x.calories !== null)
           .map((x) => x.date),
       );
-      const macrosPts = Math.min(macrosDates.size * pointsPerMacroLog, 5);
+      const macrosPts = Math.min(macrosDates.size * pointsPerDay, 5);
       const scaleRule = (r?: Rule): Rule | undefined =>
         r ? { ...r, weekly_cap: Number(r.weekly_cap) * capScale } : r;
       const cat = {
-        // Gym: 0.25 pts per qualifying day, capped at 5 (20 days = 5 pts)
-        gym: Math.min(gymCount * 0.25, 5),
+        // Gym: 5/daysInMonth pts per qualifying day, capped at 5
+        gym: Math.min(gymCount * pointsPerDay, 5),
         deep_work: applyCap(dwCount, scaleRule(ruleMap.get("deep_work"))),
         sleep: applyCap(sleepCount, scaleRule(ruleMap.get("sleep"))),
         macros: macrosPts,
