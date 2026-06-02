@@ -168,7 +168,7 @@ function Leaderboard() {
           .filter((x) => x.member_id === m.id && x.calories !== null)
           .map((x) => x.date),
       );
-      const macrosPts = Math.min(macrosDates.size * pointsPerMacroLog, 5);
+      const macrosPts = Math.min(macrosDates.size * pointsPerDay, 5);
       const scaleRule = (r?: Rule): Rule | undefined =>
         r ? { ...r, weekly_cap: Number(r.weekly_cap) * capScale } : r;
       const cat = {
