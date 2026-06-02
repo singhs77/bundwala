@@ -19,6 +19,7 @@ export const Route = createFileRoute("/admin")({
 
 function AdminPage() {
   const qc = useQueryClient();
+  const [adminPw, setAdminPw] = useState("");
 
   const { data: rules } = useQuery({
     queryKey: ["scoring_rules"],
@@ -38,7 +39,13 @@ function AdminPage() {
 
   const updateRule = useMutation({
     mutationFn: async (r: { category: string; points_per_entry: number; weekly_cap: number }) => {
-      const { error } = await supabase.from("scoring_rules").upsert(r);
+      if (!adminPw) throw new Error("Admin password required");
+      const { error } = await supabase.rpc("admin_upsert_rule", {
+        _password: adminPw,
+        _category: r.category,
+        _points: r.points_per_entry,
+        _cap: r.weekly_cap,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -46,13 +53,19 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Updated");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const [date, setDate] = useState("");
   const [label, setLabel] = useState("Meeting Day");
   const addFreeDay = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("free_days").upsert({ date, label });
+      if (!adminPw) throw new Error("Admin password required");
+      const { error } = await supabase.rpc("admin_add_free_day", {
+        _password: adminPw,
+        _date: date,
+        _label: label,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -61,20 +74,42 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Free day added");
     },
+    onError: (e: Error) => toast.error(e.message),
   });
   const removeFreeDay = useMutation({
     mutationFn: async (d: string) => {
-      const { error } = await supabase.from("free_days").delete().eq("date", d);
+      if (!adminPw) throw new Error("Admin password required");
+      const { error } = await supabase.rpc("admin_remove_free_day", {
+        _password: adminPw,
+        _date: d,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["free_days"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <AppShell title="Admin">
+      <section className="rounded-2xl border border-border bg-card p-4">
+        <Label htmlFor="admin-pw" className="text-sm font-semibold text-muted-foreground">
+          Admin password
+        </Label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Required to update scoring rules and free days below.
+        </p>
+        <Input
+          id="admin-pw"
+          type="password"
+          className="mt-2"
+          value={adminPw}
+          onChange={(e) => setAdminPw(e.target.value)}
+        />
+      </section>
+
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold text-muted-foreground">Scoring rules</h2>
         <p className="mt-1 text-xs text-muted-foreground">
