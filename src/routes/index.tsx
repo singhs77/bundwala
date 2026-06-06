@@ -12,7 +12,7 @@ import {
   startOfMonth,
   toISODate,
 } from "@/lib/week";
-import { applyCap, sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
+import { sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -35,7 +35,6 @@ function Leaderboard() {
   const ws = useMemo(() => toISODate(startOfMonth(anchor)), [anchor]);
   const we = useMemo(() => toISODate(endOfMonth(anchor)), [anchor]);
   const daysInMonth = useMemo(() => daysOfMonth(anchor).length, [anchor]);
-  const capScale = useMemo(() => daysInMonth / 7, [daysInMonth]);
   const [openTeams, setOpenTeams] = useState<Record<string, boolean>>({});
   const qc = useQueryClient();
 
@@ -188,7 +187,7 @@ function Leaderboard() {
       result.set(m.id, cat);
     }
     return result;
-  }, [data, ruleMap, anchor, capScale, daysInMonth]);
+  }, [data, ruleMap, anchor, daysInMonth]);
 
   const teamTotals = useMemo(() => {
     if (!data) return new Map<string, number>();
