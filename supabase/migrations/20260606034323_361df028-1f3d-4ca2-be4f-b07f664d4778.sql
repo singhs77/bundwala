@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.log_macros(uuid, date, integer, integer, integer, integer, integer, integer);

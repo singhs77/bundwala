@@ -661,33 +661,19 @@ export type Database = {
         Args: { _date: string; _status: string; _token: string }
         Returns: undefined
       }
-      log_macros:
-        | {
-            Args: {
-              _calories: number
-              _carbs: number
-              _date: string
-              _fat: number
-              _protein: number
-              _sugar: number
-              _token: string
-              _water: number
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              _calories: number
-              _carbs: number
-              _date: string
-              _fat: number
-              _protein: number
-              _sugar: number
-              _token: string
-              _water: string
-            }
-            Returns: undefined
-          }
+      log_macros: {
+        Args: {
+          _calories: number
+          _carbs: number
+          _date: string
+          _fat: number
+          _protein: number
+          _sugar: number
+          _token: string
+          _water: string
+        }
+        Returns: undefined
+      }
       log_sleep: {
         Args: {
           _date: string
