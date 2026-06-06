@@ -142,20 +142,18 @@ function MacrosPage() {
   }, [groupRows]);
 
   function macrosRow(log: MacrosLog | undefined) {
-    if (
-      !log ||
-      log.calories == null ||
-      log.protein == null ||
-      log.carbs == null ||
-      log.fat == null
-    ) {
+    if (!log || log.calories == null) {
       return (
         <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
           Not logged
         </span>
       );
     }
-    const hit = true;
+    const hit =
+      log.calories != null &&
+      log.protein != null &&
+      log.carbs != null &&
+      log.fat != null;
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold tabular-nums">{log.calories} cal</span>
