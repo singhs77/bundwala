@@ -112,12 +112,6 @@ function Leaderboard() {
     },
   });
 
-  const ruleMap = useMemo(() => {
-    const m = new Map<string, Rule>();
-    data?.rules.forEach((r) => m.set(r.category, r));
-    return m;
-  }, [data?.rules]);
-
   const scores = useMemo(() => {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
     const result = new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
@@ -187,7 +181,7 @@ function Leaderboard() {
       result.set(m.id, cat);
     }
     return result;
-  }, [data, ruleMap, anchor, daysInMonth]);
+  }, [data, anchor, daysInMonth]);
 
   const teamTotals = useMemo(() => {
     if (!data) return new Map<string, number>();
