@@ -16,8 +16,11 @@ export const Route = createFileRoute("/macros")({
   component: MacrosPage,
 });
 
-const FIELDS = ["calories", "protein", "carbs", "fat", "sugar", "water"] as const;
-type Field = (typeof FIELDS)[number];
+const REQUIRED_FIELDS = ["calories", "protein", "carbs", "fat"] as const;
+const NUMERIC_FIELDS = ["calories", "protein", "carbs", "fat", "sugar"] as const;
+const ALL_FIELDS = [...NUMERIC_FIELDS, "water"] as const;
+type NumericField = (typeof NUMERIC_FIELDS)[number];
+type Field = (typeof ALL_FIELDS)[number];
 type Member = { id: string; name: string };
 type MacrosLog = {
   id: string;
@@ -51,7 +54,7 @@ function MacrosPage() {
 
   useEffect(() => {
     const next: any = {};
-    FIELDS.forEach((f) => (next[f] = dayLog && (dayLog as any)[f] != null ? String((dayLog as any)[f]) : ""));
+    ALL_FIELDS.forEach((f) => (next[f] = dayLog && (dayLog as any)[f] != null ? String((dayLog as any)[f]) : ""));
     setVals(next);
   }, [dayLog, selectedDate]);
 
@@ -95,7 +98,7 @@ function MacrosPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!session) throw new Error("Not signed in");
-      const num = (f: Field) => {
+      const num = (f: NumericField) => {
         if (vals[f] === "") return null;
         const n = Number(vals[f]);
         if (!Number.isFinite(n) || n < 0) throw new Error(`Invalid ${f}`);
@@ -109,7 +112,7 @@ function MacrosPage() {
         _carbs: num("carbs"),
         _fat: num("fat"),
         _sugar: num("sugar"),
-        _water: num("water"),
+        _water: vals.water.trim() === "" ? null : vals.water.trim(),
       } as never);
       if (error) throw error;
     },
@@ -123,8 +126,8 @@ function MacrosPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const avgs: Record<Field, number> = {} as any;
-  FIELDS.forEach((f) => {
+  const avgs: Record<NumericField, number> = {} as any;
+  NUMERIC_FIELDS.forEach((f) => {
     const vals = (weekRows ?? []).map((r: any) => r[f]).filter((v: any) => v != null) as number[];
     avgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
   });
@@ -146,7 +149,11 @@ function MacrosPage() {
         </span>
       );
     }
-    const hit = log.calories != null;
+    const hit =
+      log.calories != null &&
+      log.protein != null &&
+      log.carbs != null &&
+      log.fat != null;
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold tabular-nums">{log.calories} cal</span>
@@ -185,12 +192,17 @@ function MacrosPage() {
           ))}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          {FIELDS.map((f) => (
+          {ALL_FIELDS.map((f) => (
             <div key={f}>
-              <Label htmlFor={f} className="capitalize">{f}</Label>
+              <Label htmlFor={f} className="capitalize">
+                {f}
+                {(f === "sugar" || f === "water") && (
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>
+                )}
+              </Label>
               <Input
                 id={f}
-                inputMode="numeric"
+                inputMode={f === "water" ? undefined : "numeric"}
                 value={vals[f]}
                 onChange={(e) => setVals((v) => ({ ...v, [f]: e.target.value }))}
               />
@@ -205,7 +217,7 @@ function MacrosPage() {
       <section className="mt-6 rounded-2xl border border-border bg-card p-4">
         <h3 className="text-sm font-semibold text-muted-foreground">This week's averages</h3>
         <div className="mt-3 grid grid-cols-3 gap-3">
-          {FIELDS.map((f) => (
+          {NUMERIC_FIELDS.map((f) => (
             <div key={f} className="rounded-xl bg-secondary px-3 py-2">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{f}</div>
               <div className="text-lg font-bold tabular-nums">{avgs[f]}</div>

@@ -12,7 +12,7 @@ import {
   startOfMonth,
   toISODate,
 } from "@/lib/week";
-import { applyCap, sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
+import { sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -35,7 +35,6 @@ function Leaderboard() {
   const ws = useMemo(() => toISODate(startOfMonth(anchor)), [anchor]);
   const we = useMemo(() => toISODate(endOfMonth(anchor)), [anchor]);
   const daysInMonth = useMemo(() => daysOfMonth(anchor).length, [anchor]);
-  const capScale = useMemo(() => daysInMonth / 7, [daysInMonth]);
   const [openTeams, setOpenTeams] = useState<Record<string, boolean>>({});
   const qc = useQueryClient();
 
@@ -88,7 +87,7 @@ function Leaderboard() {
             .lte("date", we),
           supabase
             .from("macros_logs")
-            .select("member_id,date,calories")
+            .select("member_id,date,calories,protein,carbs,fat")
             .gte("date", ws)
             .lte("date", we),
           supabase.from("free_days").select("date").gte("date", ws).lte("date", we),
@@ -112,12 +111,6 @@ function Leaderboard() {
       };
     },
   });
-
-  const ruleMap = useMemo(() => {
-    const m = new Map<string, Rule>();
-    data?.rules.forEach((r) => m.set(r.category, r));
-    return m;
-  }, [data?.rules]);
 
   const scores = useMemo(() => {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
@@ -165,17 +158,22 @@ function Leaderboard() {
       // Macros: (daysInMonth / 5) pts per logged day, capped at 5
       const macrosDates = new Set(
         data.macros
-          .filter((x) => x.member_id === m.id && x.calories !== null)
+          .filter(
+            (x) =>
+              x.member_id === m.id &&
+              x.calories !== null &&
+              x.protein !== null &&
+              x.carbs !== null &&
+              x.fat !== null,
+          )
           .map((x) => x.date),
       );
       const macrosPts = Math.min(macrosDates.size * pointsPerDay, 5);
-      const scaleRule = (r?: Rule): Rule | undefined =>
-        r ? { ...r, weekly_cap: Number(r.weekly_cap) * capScale } : r;
       const cat = {
         // Gym: 5/daysInMonth pts per qualifying day, capped at 5
         gym: Math.min(gymCount * pointsPerDay, 5),
-        deep_work: applyCap(dwCount, scaleRule(ruleMap.get("deep_work"))),
-        sleep: applyCap(sleepCount, scaleRule(ruleMap.get("sleep"))),
+        deep_work: Math.min(dwCount * 0.3, 5),
+        sleep: Math.min(sleepCount * 0.1, 5),
         macros: macrosPts,
         total: 0,
       };
@@ -183,7 +181,7 @@ function Leaderboard() {
       result.set(m.id, cat);
     }
     return result;
-  }, [data, ruleMap, anchor, capScale, daysInMonth]);
+  }, [data, anchor, daysInMonth]);
 
   const teamTotals = useMemo(() => {
     if (!data) return new Map<string, number>();
