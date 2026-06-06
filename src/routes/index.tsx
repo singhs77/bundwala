@@ -88,7 +88,7 @@ function Leaderboard() {
             .lte("date", we),
           supabase
             .from("macros_logs")
-            .select("member_id,date,calories")
+            .select("member_id,date,calories,protein,carbs,fat")
             .gte("date", ws)
             .lte("date", we),
           supabase.from("free_days").select("date").gte("date", ws).lte("date", we),
