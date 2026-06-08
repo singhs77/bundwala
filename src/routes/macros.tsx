@@ -60,6 +60,46 @@ function MacrosPage() {
 
   const ms = toISODate(startOfMonth(new Date()));
   const meMonth = toISODate(endOfMonth(new Date()));
+
+  const { data: myMember } = useQuery({
+    queryKey: ["my-member", me],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("members")
+        .select("id,calorie_goal")
+        .eq("id", me!)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!me,
+  });
+  const [goalInput, setGoalInput] = useState<string>("");
+  useEffect(() => {
+    setGoalInput((myMember as any)?.calorie_goal != null ? String((myMember as any).calorie_goal) : "");
+  }, [myMember]);
+
+  const saveGoal = useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error("Not signed in");
+      const raw = goalInput.trim();
+      const goal = raw === "" ? null : Math.round(Number(raw));
+      if (goal != null && (!Number.isFinite(goal) || goal < 0 || goal > 20000)) {
+        throw new Error("Invalid goal");
+      }
+      const { error } = await supabase.rpc("member_set_calorie_goal", {
+        _token: session.token,
+        _goal: goal,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-member"] });
+      qc.invalidateQueries({ queryKey: ["member-logs"] });
+      toast.success("Goal saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const { data: weekRows } = useQuery({
     queryKey: ["macros-month-self", me, ms, meMonth],
     queryFn: async () => {
