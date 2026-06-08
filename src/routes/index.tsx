@@ -134,7 +134,6 @@ function Leaderboard() {
       return result;
     }
     const month = daysOfMonth(anchor).map(toISODate);
-    const pointsPerDay = 5 / daysInMonth;
     for (const m of data.members) {
       const gymCount = data.gym.filter(
         (g) => g.member_id === m.id && (g.status === "yes" || g.status === "home"),
@@ -168,13 +167,11 @@ function Leaderboard() {
           )
           .map((x) => x.date),
       );
-      const macrosPts = Math.min(macrosDates.size * pointsPerDay, 5);
       const cat = {
-        // Gym: 5/daysInMonth pts per qualifying day, capped at 5
-        gym: Math.min(gymCount * pointsPerDay, 5),
-        deep_work: Math.min(dwCount * 0.3, 5),
-        sleep: Math.min(sleepCount * 0.1, 5),
-        macros: macrosPts,
+        gym: gymCount * 0.2,
+        deep_work: dwCount * 0.3,
+        sleep: sleepCount * 0.1,
+        macros: macrosDates.size * 0.2,
         total: 0,
       };
       cat.total = sumTotal(cat);
