@@ -7,7 +7,7 @@ import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { endOfWeek, startOfWeek, startOfMonth, endOfMonth, toISODate } from "@/lib/week";
+import { startOfMonth, endOfMonth, toISODate } from "@/lib/week";
 import { toast } from "sonner";
 import { MemberFeed } from "@/components/app/MemberFeed";
 
@@ -58,17 +58,17 @@ function MacrosPage() {
     setVals(next);
   }, [dayLog, selectedDate]);
 
-  const ws = toISODate(startOfWeek(new Date()));
-  const we = toISODate(endOfWeek(new Date()));
+  const ms = toISODate(startOfMonth(new Date()));
+  const meMonth = toISODate(endOfMonth(new Date()));
   const { data: weekRows } = useQuery({
-    queryKey: ["macros-week", me, ws, we],
+    queryKey: ["macros-month-self", me, ms, meMonth],
     queryFn: async () => {
       const { data } = await supabase
         .from("macros_logs")
         .select("*")
         .eq("member_id", me!)
-        .gte("date", ws)
-        .lte("date", we);
+        .gte("date", ms)
+        .lte("date", meMonth);
       return data ?? [];
     },
     enabled: !!me,
@@ -118,7 +118,7 @@ function MacrosPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["macros-today"] });
-      qc.invalidateQueries({ queryKey: ["macros-week"] });
+      qc.invalidateQueries({ queryKey: ["macros-month-self"] });
       qc.invalidateQueries({ queryKey: ["macros-month"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
@@ -215,7 +215,7 @@ function MacrosPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-border bg-card p-4">
-        <h3 className="text-sm font-semibold text-muted-foreground">This week's averages</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground">This month's averages</h3>
         <div className="mt-3 grid grid-cols-3 gap-3">
           {NUMERIC_FIELDS.map((f) => (
             <div key={f} className="rounded-xl bg-secondary px-3 py-2">
