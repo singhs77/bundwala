@@ -315,16 +315,19 @@ function Leaderboard() {
                   {teamMembers.map((m) => {
                     const s = scores.get(m.id) ?? { gym: 0, deep_work: 0, sleep: 0, macros: 0, total: 0 };
                     return (
-                      <li
-                        key={m.id}
-                        className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums"
-                      >
-                        <div className="truncate font-medium">{m.name}</div>
-                        <div className="w-9 text-right text-muted-foreground">{s.gym.toFixed(1)}</div>
-                        <div className="w-9 text-right text-muted-foreground">{s.deep_work.toFixed(1)}</div>
-                        <div className="w-9 text-right text-muted-foreground">{s.sleep.toFixed(1)}</div>
-                        <div className="w-9 text-right text-muted-foreground">{s.macros.toFixed(1)}</div>
-                        <div className="w-10 text-right font-semibold">{s.total.toFixed(1)}</div>
+                      <li key={m.id}>
+                        <Link
+                          to="/members/$memberId"
+                          params={{ memberId: m.id }}
+                          className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums transition-colors hover:bg-accent/50"
+                        >
+                          <div className="truncate font-medium">{m.name}</div>
+                          <div className="w-9 text-right text-muted-foreground">{s.gym.toFixed(1)}</div>
+                          <div className="w-9 text-right text-muted-foreground">{s.deep_work.toFixed(1)}</div>
+                          <div className="w-9 text-right text-muted-foreground">{s.sleep.toFixed(1)}</div>
+                          <div className="w-9 text-right text-muted-foreground">{s.macros.toFixed(1)}</div>
+                          <div className="w-10 text-right font-semibold">{s.total.toFixed(1)}</div>
+                        </Link>
                       </li>
                     );
                   })}
