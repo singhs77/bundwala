@@ -60,6 +60,46 @@ function MacrosPage() {
 
   const ms = toISODate(startOfMonth(new Date()));
   const meMonth = toISODate(endOfMonth(new Date()));
+
+  const { data: myMember } = useQuery({
+    queryKey: ["my-member", me],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("members")
+        .select("id,calorie_goal")
+        .eq("id", me!)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!me,
+  });
+  const [goalInput, setGoalInput] = useState<string>("");
+  useEffect(() => {
+    setGoalInput((myMember as any)?.calorie_goal != null ? String((myMember as any).calorie_goal) : "");
+  }, [myMember]);
+
+  const saveGoal = useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error("Not signed in");
+      const raw = goalInput.trim();
+      const goal = raw === "" ? null : Math.round(Number(raw));
+      if (goal != null && (!Number.isFinite(goal) || goal < 0 || goal > 20000)) {
+        throw new Error("Invalid goal");
+      }
+      const { error } = await supabase.rpc("member_set_calorie_goal", {
+        _token: session.token,
+        _goal: goal,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-member"] });
+      qc.invalidateQueries({ queryKey: ["member-logs"] });
+      toast.success("Goal saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const { data: weekRows } = useQuery({
     queryKey: ["macros-month-self", me, ms, meMonth],
     queryFn: async () => {
@@ -171,6 +211,27 @@ function MacrosPage() {
 
   return (
     <AppShell title="Macros">
+      <section className="mb-4 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Label htmlFor="calorie-goal">Daily calorie goal</Label>
+            <Input
+              id="calorie-goal"
+              inputMode="numeric"
+              placeholder="e.g. 2400"
+              value={goalInput}
+              onChange={(e) => setGoalInput(e.target.value)}
+            />
+          </div>
+          <Button onClick={() => saveGoal.mutate()} disabled={saveGoal.isPending}>
+            Save
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Soon: macros points will require all 4 macros logged AND calories within ±100 of this goal.
+        </p>
+      </section>
+
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="font-semibold">Log macros</h2>
         <div className="mt-3 grid grid-cols-2 gap-2">
