@@ -312,6 +312,7 @@ export type Database = {
       members: {
         Row: {
           avatar_url: string | null
+          calorie_goal: number | null
           created_at: string
           has_password: boolean
           id: string
@@ -320,6 +321,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          calorie_goal?: number | null
           created_at?: string
           has_password?: boolean
           id?: string
@@ -328,6 +330,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          calorie_goal?: number | null
           created_at?: string
           has_password?: boolean
           id?: string
@@ -693,6 +696,10 @@ export type Database = {
       }
       member_set_avatar: {
         Args: { _token: string; _url: string }
+        Returns: undefined
+      }
+      member_set_calorie_goal: {
+        Args: { _goal: number; _token: string }
         Returns: undefined
       }
       member_set_password: {
