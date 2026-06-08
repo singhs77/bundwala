@@ -211,6 +211,27 @@ function MacrosPage() {
 
   return (
     <AppShell title="Macros">
+      <section className="mb-4 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Label htmlFor="calorie-goal">Daily calorie goal</Label>
+            <Input
+              id="calorie-goal"
+              inputMode="numeric"
+              placeholder="e.g. 2400"
+              value={goalInput}
+              onChange={(e) => setGoalInput(e.target.value)}
+            />
+          </div>
+          <Button onClick={() => saveGoal.mutate()} disabled={saveGoal.isPending}>
+            Save
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Soon: macros points will require all 4 macros logged AND calories within ±100 of this goal.
+        </p>
+      </section>
+
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="font-semibold">Log macros</h2>
         <div className="mt-3 grid grid-cols-2 gap-2">
