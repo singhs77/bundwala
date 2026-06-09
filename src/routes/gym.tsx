@@ -137,11 +137,18 @@ function GymPage() {
   const selectedLog = logs?.find((l) => l.date === selectedDate);
 
   const dateLabel = (d: string) => {
-    if (d === today) return "Today";
-    const t = new Date(today + "T00:00:00");
-    const diff = Math.round((t.getTime() - new Date(d + "T00:00:00").getTime()) / 86400000);
-    if (diff === 1) return "Yesterday";
-    return `${diff} days ago`;
+    const date = new Date(d + "T00:00:00");
+    const month = date.toLocaleDateString("en-US", { month: "long" });
+    const day = date.getDate();
+    const suffix =
+      day % 10 === 1 && day !== 11
+        ? "st"
+        : day % 10 === 2 && day !== 12
+          ? "nd"
+          : day % 10 === 3 && day !== 13
+            ? "rd"
+            : "th";
+    return `${month} ${day}${suffix}`;
   };
 
   return (
