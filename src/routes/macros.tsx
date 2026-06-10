@@ -114,6 +114,37 @@ function MacrosPage() {
     enabled: !!me,
   });
 
+  const ws = toISODate(startOfWeek(new Date()));
+  const we = toISODate(endOfWeek(new Date()));
+
+  const { data: weekRows } = useQuery({
+    queryKey: ["macros-week-self", me, ws, we],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("macros_logs")
+        .select("*")
+        .eq("member_id", me!)
+        .gte("date", ws)
+        .lte("date", we);
+      return data ?? [];
+    },
+    enabled: !!me,
+  });
+
+  const { data: monthRows } = useQuery({
+    queryKey: ["macros-month-self", me, ms, meMonth],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("macros_logs")
+        .select("*")
+        .eq("member_id", me!)
+        .gte("date", ms)
+        .lte("date", meMonth);
+      return data ?? [];
+    },
+    enabled: !!me,
+  });
+
   const { data: groupRows } = useQuery({
     queryKey: ["macros-month"],
     queryFn: async () => {
