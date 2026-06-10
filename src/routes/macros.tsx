@@ -7,7 +7,7 @@ import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { startOfMonth, endOfMonth, toISODate } from "@/lib/week";
+import { startOfMonth, endOfMonth, toISODate, startOfWeek, endOfWeek, formatRange } from "@/lib/week";
 import { toast } from "sonner";
 import { MemberFeed } from "@/components/app/MemberFeed";
 
@@ -60,6 +60,8 @@ function MacrosPage() {
 
   const ms = toISODate(startOfMonth(new Date()));
   const meMonth = toISODate(endOfMonth(new Date()));
+  const ws = toISODate(startOfWeek(new Date()));
+  const we = toISODate(endOfWeek(new Date()));
 
   const { data: myMember } = useQuery({
     queryKey: ["my-member", me],
@@ -101,6 +103,20 @@ function MacrosPage() {
   });
 
   const { data: weekRows } = useQuery({
+    queryKey: ["macros-week-self", me, ws, we],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("macros_logs")
+        .select("*")
+        .eq("member_id", me!)
+        .gte("date", ws)
+        .lte("date", we);
+      return data ?? [];
+    },
+    enabled: !!me,
+  });
+
+  const { data: monthRows } = useQuery({
     queryKey: ["macros-month-self", me, ms, meMonth],
     queryFn: async () => {
       const { data } = await supabase
@@ -158,6 +174,7 @@ function MacrosPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["macros-today"] });
+      qc.invalidateQueries({ queryKey: ["macros-week-self"] });
       qc.invalidateQueries({ queryKey: ["macros-month-self"] });
       qc.invalidateQueries({ queryKey: ["macros-month"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
@@ -166,10 +183,16 @@ function MacrosPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const avgs: Record<NumericField, number> = {} as any;
+  const weekAvgs: Record<NumericField, number> = {} as any;
   NUMERIC_FIELDS.forEach((f) => {
     const vals = (weekRows ?? []).map((r: any) => r[f]).filter((v: any) => v != null) as number[];
-    avgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    weekAvgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  });
+
+  const monthAvgs: Record<NumericField, number> = {} as any;
+  NUMERIC_FIELDS.forEach((f) => {
+    const vals = (monthRows ?? []).map((r: any) => r[f]).filter((v: any) => v != null) as number[];
+    monthAvgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
   });
 
   const logsByMember = useMemo(() => {
@@ -275,15 +298,29 @@ function MacrosPage() {
         </Button>
       </section>
 
-      <section className="mt-6 rounded-2xl border border-border bg-card p-4">
-        <h3 className="text-sm font-semibold text-muted-foreground">This month's averages</h3>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          {NUMERIC_FIELDS.map((f) => (
-            <div key={f} className="rounded-xl bg-secondary px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{f}</div>
-              <div className="text-lg font-bold tabular-nums">{avgs[f]}</div>
-            </div>
-          ))}
+      <section className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="text-sm font-semibold text-muted-foreground">This week's averages</h3>
+          <p className="text-xs text-muted-foreground">{formatRange(new Date())}</p>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {NUMERIC_FIELDS.map((f) => (
+              <div key={f} className="rounded-xl bg-secondary px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{f}</div>
+                <div className="text-lg font-bold tabular-nums">{weekAvgs[f]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h3 className="text-sm font-semibold text-muted-foreground">This month's averages</h3>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {NUMERIC_FIELDS.map((f) => (
+              <div key={f} className="rounded-xl bg-secondary px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{f}</div>
+                <div className="text-lg font-bold tabular-nums">{monthAvgs[f]}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
