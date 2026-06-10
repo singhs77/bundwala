@@ -7,7 +7,7 @@ import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { startOfMonth, endOfMonth, toISODate } from "@/lib/week";
+import { startOfMonth, endOfMonth, toISODate, startOfWeek, endOfWeek, formatRange } from "@/lib/week";
 import { toast } from "sonner";
 import { MemberFeed } from "@/components/app/MemberFeed";
 
