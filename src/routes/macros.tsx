@@ -60,6 +60,8 @@ function MacrosPage() {
 
   const ms = toISODate(startOfMonth(new Date()));
   const meMonth = toISODate(endOfMonth(new Date()));
+  const ws = toISODate(startOfWeek(new Date()));
+  const we = toISODate(endOfWeek(new Date()));
 
   const { data: myMember } = useQuery({
     queryKey: ["my-member", me],
