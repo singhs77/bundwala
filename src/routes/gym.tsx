@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Check, X, Home } from "lucide-react";
-import { toISODate, startOfMonth, endOfMonth } from "@/lib/week";
+import { toISODate, startOfMonth, endOfMonth, daysOfMonth, formatMonth } from "@/lib/week";
 import { toast } from "sonner";
 import { useMemo, useState } from "react";
 import { MemberFeed } from "@/components/app/MemberFeed";
@@ -66,27 +66,31 @@ function GymPage() {
   const session = useSession();
   const qc = useQueryClient();
   const today = toISODate(new Date());
-  const days = lastNDays(14);
   const [selectedDate, setSelectedDate] = useState(today);
   const pickerDays = lastNDays(3).slice().reverse(); // today, yesterday, 2 days ago
 
+  const now = new Date();
+  const monthDays = daysOfMonth(now);
+  const monthStartISO = toISODate(startOfMonth(now));
+  const monthEndISO = toISODate(endOfMonth(now));
+
   const { data: logs } = useQuery({
-    queryKey: ["gym-logs", me, days[0], days[days.length - 1]],
+    queryKey: ["gym-logs", me, monthStartISO, monthEndISO],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("gym_logs")
         .select("*")
         .eq("member_id", me!)
-        .gte("date", days[0])
-        .lte("date", days[days.length - 1]);
+        .gte("date", monthStartISO)
+        .lte("date", monthEndISO);
       if (error) throw error;
       return data ?? [];
     },
     enabled: !!me,
   });
 
-  const monthStart = toISODate(startOfMonth(new Date()));
-  const monthEnd = toISODate(endOfMonth(new Date()));
+  const monthStart = monthStartISO;
+  const monthEnd = monthEndISO;
   const { data: monthData } = useQuery({
     queryKey: ["gym-month", monthStart, monthEnd],
     queryFn: async () => {
@@ -114,6 +118,15 @@ function GymPage() {
     }
     return m;
   }, [monthData]);
+
+  const myMonthCount = useMemo(
+    () => (logs ?? []).filter((l) => l.status === "yes" || l.status === "home").length,
+    [logs],
+  );
+  const myHitCount = useMemo(
+    () => (logs ?? []).filter((l) => l.status === "yes").length,
+    [logs],
+  );
 
   const setStatus = useMutation({
     mutationFn: async ({ date, status }: { date: string; status: GymStatus }) => {
@@ -196,10 +209,32 @@ function GymPage() {
       </section>
 
       <section className="mt-6">
-        <h3 className="mb-3 text-sm font-semibold text-muted-foreground">Last 14 days</h3>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">{formatMonth(now)}</h3>
+          <div className="text-right">
+            <div className="text-2xl font-bold leading-none">{myMonthCount}</div>
+            <div className="text-[11px] text-muted-foreground">
+              workouts this month{myHitCount !== myMonthCount ? ` (${myHitCount} gym)` : ""}
+            </div>
+          </div>
+        </div>
         <div className="grid grid-cols-7 gap-1.5">
-          {days.map((d) => {
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+            <div
+              key={i}
+              className="text-center text-[10px] font-semibold uppercase text-muted-foreground"
+            >
+              {d}
+            </div>
+          ))}
+          {Array.from({ length: monthDays[0].getDay() }).map((_, i) => (
+            <div key={`pad-${i}`} />
+          ))}
+          {monthDays.map((date) => {
+            const d = toISODate(date);
             const log = logs?.find((l) => l.date === d);
+            const isToday = d === today;
+            const isFuture = d > today;
             const tone =
               log?.status === "yes"
                 ? "bg-success text-success-foreground"
@@ -207,14 +242,15 @@ function GymPage() {
                   ? "bg-warning text-warning-foreground"
                   : log?.status === "no"
                     ? "bg-destructive text-destructive-foreground"
-                    : "bg-secondary text-muted-foreground";
-            const day = new Date(d + "T00:00:00").getDate();
+                    : isFuture
+                      ? "bg-secondary/40 text-muted-foreground/50"
+                      : "bg-secondary text-muted-foreground";
             return (
               <div
                 key={d}
-                className={`flex aspect-square flex-col items-center justify-center rounded-lg text-xs font-semibold ${tone}`}
+                className={`flex aspect-square flex-col items-center justify-center rounded-lg text-xs font-semibold ${tone} ${isToday ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}`}
               >
-                {day}
+                {date.getDate()}
               </div>
             );
           })}
@@ -225,8 +261,17 @@ function GymPage() {
         title="Everyone's gym logs"
         members={monthData?.members ?? []}
         renderToday={(mid) => {
-          const log = logsByMember.get(mid)?.find((l) => l.date === today);
-          return statusPill(log?.status);
+          const rows = logsByMember.get(mid) ?? [];
+          const log = rows.find((l) => l.date === today);
+          const count = rows.filter((l) => l.status === "yes" || l.status === "home").length;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              {statusPill(log?.status)}
+              <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                {count} this month
+              </span>
+            </div>
+          );
         }}
         renderHistory={(mid) => {
           const rows = logsByMember.get(mid) ?? [];
