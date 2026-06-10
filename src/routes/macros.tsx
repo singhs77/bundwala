@@ -101,23 +101,6 @@ function MacrosPage() {
   });
 
   const { data: weekRows } = useQuery({
-    queryKey: ["macros-month-self", me, ms, meMonth],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("macros_logs")
-        .select("*")
-        .eq("member_id", me!)
-        .gte("date", ms)
-        .lte("date", meMonth);
-      return data ?? [];
-    },
-    enabled: !!me,
-  });
-
-  const ws = toISODate(startOfWeek(new Date()));
-  const we = toISODate(endOfWeek(new Date()));
-
-  const { data: weekRows } = useQuery({
     queryKey: ["macros-week-self", me, ws, we],
     queryFn: async () => {
       const { data } = await supabase
@@ -189,6 +172,7 @@ function MacrosPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["macros-today"] });
+      qc.invalidateQueries({ queryKey: ["macros-week-self"] });
       qc.invalidateQueries({ queryKey: ["macros-month-self"] });
       qc.invalidateQueries({ queryKey: ["macros-month"] });
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
@@ -197,10 +181,16 @@ function MacrosPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const avgs: Record<NumericField, number> = {} as any;
+  const weekAvgs: Record<NumericField, number> = {} as any;
   NUMERIC_FIELDS.forEach((f) => {
     const vals = (weekRows ?? []).map((r: any) => r[f]).filter((v: any) => v != null) as number[];
-    avgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    weekAvgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  });
+
+  const monthAvgs: Record<NumericField, number> = {} as any;
+  NUMERIC_FIELDS.forEach((f) => {
+    const vals = (monthRows ?? []).map((r: any) => r[f]).filter((v: any) => v != null) as number[];
+    monthAvgs[f] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
   });
 
   const logsByMember = useMemo(() => {
