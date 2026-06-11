@@ -350,13 +350,8 @@ function Leaderboard() {
                   Least healthy (gym + macros)
                 </div>
                 <div className="text-xs font-semibold truncate">{leastHealthy.name}</div>
-                <div className="flex items-center gap-1.5">
-                  <div className="self-start rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                    {leastHealthy.score.toFixed(1)}
-                  </div>
-                  <div className="text-[10px] text-emerald-700/70 dark:text-emerald-300/70">
-                    {"\n"}
-                  </div>
+                <div className="self-start rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                  {leastHealthy.score.toFixed(1)}
                 </div>
               </div>
             )}
