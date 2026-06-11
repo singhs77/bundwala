@@ -301,15 +301,15 @@ function Leaderboard() {
                 </div>
               </div>
             )}
-            {lowestDWPlusSleep && (
+            {lowestSleep && (
               <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-4 py-3">
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  nigga what is you doing?
+                  lowest sleep
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">{lowestDWPlusSleep.name}</div>
+                  <div className="text-sm font-semibold">{lowestSleep.name}</div>
                   <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
-                    {lowestDWPlusSleep.score.toFixed(1)}
+                    {lowestSleep.score.toFixed(1)}
                   </div>
                 </div>
               </div>
