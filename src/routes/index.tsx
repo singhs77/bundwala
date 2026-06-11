@@ -253,6 +253,40 @@ function Leaderboard() {
     return worst;
   }, [data, scores]);
 
+  const leastHealthy = useMemo(() => {
+    if (!data) return null;
+    const freeAgentTeamIds = new Set(
+      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
+    );
+    let worst: { name: string; score: number } | null = null;
+    for (const m of data.members) {
+      if (!m.team_id) continue;
+      if (freeAgentTeamIds.has(m.team_id)) continue;
+      const s = scores.get(m.id);
+      if (!s) continue;
+      const avg = (s.gym + s.macros) / 2;
+      if (!worst || avg < worst.score) worst = { name: m.name, score: avg };
+    }
+    return worst;
+  }, [data, scores]);
+
+  const top3 = useMemo(() => {
+    if (!data) return [];
+    const freeAgentTeamIds = new Set(
+      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
+    );
+    const arr: { name: string; total: number }[] = [];
+    for (const m of data.members) {
+      if (!m.team_id) continue;
+      if (freeAgentTeamIds.has(m.team_id)) continue;
+      const s = scores.get(m.id);
+      if (!s) continue;
+      arr.push({ name: m.name, total: s.total });
+    }
+    arr.sort((a, b) => b.total - a.total);
+    return arr.slice(0, 3);
+  }, [data, scores]);
+
   return (
     <AppShell title="Standings">
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-card p-3">
