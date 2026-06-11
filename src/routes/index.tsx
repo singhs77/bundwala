@@ -273,20 +273,50 @@ function Leaderboard() {
       <Announcements />
 
       {dogshit && (
-        <div className="mb-3 flex items-center justify-between rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Skull className="h-4 w-4 text-destructive" />
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-destructive">
-                Most Dogshit Player
+        <>
+          <div className="mb-3 flex items-center justify-between rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Skull className="h-4 w-4 text-destructive" />
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-destructive">
+                  Most Dogshit Player
+                </div>
+                <div className="text-sm font-semibold">{dogshit.name}</div>
               </div>
-              <div className="text-sm font-semibold">{dogshit.name}</div>
+            </div>
+            <div className="rounded-full bg-background/60 px-3 py-1 text-sm font-bold tabular-nums">
+              {dogshit.total.toFixed(1)}
             </div>
           </div>
-          <div className="rounded-full bg-background/60 px-3 py-1 text-sm font-bold tabular-nums">
-            {dogshit.total.toFixed(1)}
+          <div className="mb-3 grid grid-cols-2 gap-3">
+            {lowestDW && (
+              <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-4 py-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Lowest deepwork score
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">{lowestDW.name}</div>
+                  <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
+                    {lowestDW.score.toFixed(1)}
+                  </div>
+                </div>
+              </div>
+            )}
+            {lowestDWPlusSleep && (
+              <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-4 py-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  nigga what is you doing?
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">{lowestDWPlusSleep.name}</div>
+                  <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
+                    {lowestDWPlusSleep.score.toFixed(1)}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        </>
       )}
 
       {isLoading || !data ? (
