@@ -347,7 +347,7 @@ function Leaderboard() {
             {leastHealthy && (
               <div className="flex flex-col gap-1 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-3">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  Least healthy
+                  Least healthy (gym + macros)
                 </div>
                 <div className="text-xs font-semibold truncate">{leastHealthy.name}</div>
                 <div className="flex items-center gap-1.5">
