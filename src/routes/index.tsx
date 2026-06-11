@@ -258,14 +258,14 @@ function Leaderboard() {
     const freeAgentTeamIds = new Set(
       data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
     );
-    let worst: { name: string; score: number } | null = null;
+    let worst: { name: string; score: number; gym: number; macros: number } | null = null;
     for (const m of data.members) {
       if (!m.team_id) continue;
       if (freeAgentTeamIds.has(m.team_id)) continue;
       const s = scores.get(m.id);
       if (!s) continue;
       const avg = (s.gym + s.macros) / 2;
-      if (!worst || avg < worst.score) worst = { name: m.name, score: avg };
+      if (!worst || avg < worst.score) worst = { name: m.name, score: avg, gym: s.gym, macros: s.macros };
     }
     return worst;
   }, [data, scores]);
