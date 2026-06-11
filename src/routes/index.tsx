@@ -355,7 +355,7 @@ function Leaderboard() {
                     {leastHealthy.score.toFixed(1)}
                   </div>
                   <div className="text-[10px] text-emerald-700/70 dark:text-emerald-300/70">
-                    gym {leastHealthy.gym.toFixed(1)} + macros {leastHealthy.macros.toFixed(1)}
+                    {"\n"}
                   </div>
                 </div>
               </div>
