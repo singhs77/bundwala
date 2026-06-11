@@ -258,14 +258,14 @@ function Leaderboard() {
     const freeAgentTeamIds = new Set(
       data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
     );
-    let worst: { name: string; score: number } | null = null;
+    let worst: { name: string; score: number; gym: number; macros: number } | null = null;
     for (const m of data.members) {
       if (!m.team_id) continue;
       if (freeAgentTeamIds.has(m.team_id)) continue;
       const s = scores.get(m.id);
       if (!s) continue;
       const avg = (s.gym + s.macros) / 2;
-      if (!worst || avg < worst.score) worst = { name: m.name, score: avg };
+      if (!worst || avg < worst.score) worst = { name: m.name, score: avg, gym: s.gym, macros: s.macros };
     }
     return worst;
   }, [data, scores]);
@@ -350,8 +350,13 @@ function Leaderboard() {
                   Least healthy
                 </div>
                 <div className="text-xs font-semibold truncate">{leastHealthy.name}</div>
-                <div className="self-start rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                  {leastHealthy.score.toFixed(1)}
+                <div className="flex items-center gap-1.5">
+                  <div className="self-start rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                    {leastHealthy.score.toFixed(1)}
+                  </div>
+                  <div className="text-[10px] text-emerald-700/70 dark:text-emerald-300/70">
+                    gym {leastHealthy.gym.toFixed(1)} + macros {leastHealthy.macros.toFixed(1)}
+                  </div>
                 </div>
               </div>
             )}
