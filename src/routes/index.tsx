@@ -221,6 +221,39 @@ function Leaderboard() {
     return worst;
   }, [data, scores]);
 
+  const lowestDW = useMemo(() => {
+    if (!data) return null;
+    const freeAgentTeamIds = new Set(
+      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
+    );
+    let worst: { name: string; score: number } | null = null;
+    for (const m of data.members) {
+      if (!m.team_id) continue;
+      if (freeAgentTeamIds.has(m.team_id)) continue;
+      const s = scores.get(m.id);
+      if (!s) continue;
+      if (!worst || s.deep_work < worst.score) worst = { name: m.name, score: s.deep_work };
+    }
+    return worst;
+  }, [data, scores]);
+
+  const lowestDWPlusSleep = useMemo(() => {
+    if (!data) return null;
+    const freeAgentTeamIds = new Set(
+      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
+    );
+    let worst: { name: string; score: number } | null = null;
+    for (const m of data.members) {
+      if (!m.team_id) continue;
+      if (freeAgentTeamIds.has(m.team_id)) continue;
+      const s = scores.get(m.id);
+      if (!s) continue;
+      const combined = s.deep_work + s.sleep;
+      if (!worst || combined < worst.score) worst = { name: m.name, score: combined };
+    }
+    return worst;
+  }, [data, scores]);
+
   return (
     <AppShell title="Standings">
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-card p-3">
