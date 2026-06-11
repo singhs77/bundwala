@@ -253,6 +253,40 @@ function Leaderboard() {
     return worst;
   }, [data, scores]);
 
+  const leastHealthy = useMemo(() => {
+    if (!data) return null;
+    const freeAgentTeamIds = new Set(
+      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
+    );
+    let worst: { name: string; score: number } | null = null;
+    for (const m of data.members) {
+      if (!m.team_id) continue;
+      if (freeAgentTeamIds.has(m.team_id)) continue;
+      const s = scores.get(m.id);
+      if (!s) continue;
+      const avg = (s.gym + s.macros) / 2;
+      if (!worst || avg < worst.score) worst = { name: m.name, score: avg };
+    }
+    return worst;
+  }, [data, scores]);
+
+  const top3 = useMemo(() => {
+    if (!data) return [];
+    const freeAgentTeamIds = new Set(
+      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
+    );
+    const arr: { name: string; total: number }[] = [];
+    for (const m of data.members) {
+      if (!m.team_id) continue;
+      if (freeAgentTeamIds.has(m.team_id)) continue;
+      const s = scores.get(m.id);
+      if (!s) continue;
+      arr.push({ name: m.name, total: s.total });
+    }
+    arr.sort((a, b) => b.total - a.total);
+    return arr.slice(0, 3);
+  }, [data, scores]);
+
   return (
     <AppShell title="Standings">
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-card p-3">
@@ -287,34 +321,67 @@ function Leaderboard() {
               {dogshit.total.toFixed(1)}
             </div>
           </div>
-          <div className="mb-3 grid grid-cols-2 gap-3">
+          <div className="mb-3 grid grid-cols-3 gap-2">
             {lowestDW && (
-              <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-4 py-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Lowest deepwork score
+              <div className="flex flex-col gap-1 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Lowest deepwork
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">{lowestDW.name}</div>
-                  <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
-                    {lowestDW.score.toFixed(1)}
-                  </div>
+                <div className="text-xs font-semibold truncate">{lowestDW.name}</div>
+                <div className="self-start rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                  {lowestDW.score.toFixed(1)}
                 </div>
               </div>
             )}
             {lowestSleep && (
-              <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-4 py-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  lowest sleep
+              <div className="flex flex-col gap-1 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                  Lowest sleep
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">{lowestSleep.name}</div>
-                  <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
-                    {lowestSleep.score.toFixed(1)}
-                  </div>
+                <div className="text-xs font-semibold truncate">{lowestSleep.name}</div>
+                <div className="self-start rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-700 dark:text-sky-300">
+                  {lowestSleep.score.toFixed(1)}
+                </div>
+              </div>
+            )}
+            {leastHealthy && (
+              <div className="flex flex-col gap-1 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Least healthy
+                </div>
+                <div className="text-xs font-semibold truncate">{leastHealthy.name}</div>
+                <div className="self-start rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                  {leastHealthy.score.toFixed(1)}
                 </div>
               </div>
             )}
           </div>
+          {top3.length > 0 && (
+            <div className="mb-3 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-yellow-700 dark:text-yellow-400">
+                  Top 3 highest scores
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {top3.map((p, i) => {
+                  const medals = ["🥇", "🥈", "🥉"];
+                  return (
+                    <div key={p.name + i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <span>{medals[i]}</span>
+                        <span>{p.name}</span>
+                      </div>
+                      <div className="rounded-full bg-yellow-500/20 px-3 py-0.5 text-sm font-bold tabular-nums text-yellow-700 dark:text-yellow-300">
+                        {p.total.toFixed(1)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
 
