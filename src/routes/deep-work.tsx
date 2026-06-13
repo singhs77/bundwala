@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { useSession } from "@/lib/me";
+import { useMe, useSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,119 +16,126 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus, Send, Clock, Trash2 } from "lucide-react";
-import { toISODate } from "@/lib/week";
+import { toISODate, startOfMonth, endOfMonth } from "@/lib/week";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
+import { MemberFeed } from "@/components/app/MemberFeed";
 
 export const Route = createFileRoute("/deep-work")({
   head: () => ({ meta: [{ title: "Deep Work — Group Tracker" }] }),
   component: DeepWorkPage,
 });
 
+type Member = { id: string; name: string };
+type DWSession = {
+  id: string;
+  member_id: string;
+  date: string;
+  topic: string | null;
+  minutes: number | null;
+  learnings: string | null;
+  personal_notes: string | null;
+  created_at: string;
+};
+
 function DeepWorkPage() {
+  const me = useMe();
   const session = useSession();
   const qc = useQueryClient();
-  const [personFilter, setPersonFilter] = useState<string>("all");
+  const today = toISODate(new Date());
+  const ms = toISODate(startOfMonth(new Date()));
+  const me_ = toISODate(endOfMonth(new Date()));
 
-  const { data: sessions } = useQuery({
-    queryKey: ["deep-work-feed-all"],
+  const { data: groupRows } = useQuery({
+    queryKey: ["dw-month", ms, me_],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("deep_work")
-        .select("*, members(name)")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      const [{ data: members }, { data: logs }] = await Promise.all([
+        supabase.from("members").select("id,name"),
+        supabase
+          .from("deep_work")
+          .select("*")
+          .gte("date", ms)
+          .lte("date", me_)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false }),
+      ]);
+      return {
+        members: (members ?? []) as Member[],
+        logs: (logs ?? []) as DWSession[],
+      };
     },
   });
 
-  const people = useMemo(() => {
-    const map = new Map<string, string>();
-    sessions?.forEach((s: any) => {
-      if (s.member_id && s.members?.name) map.set(s.member_id, s.members.name);
-    });
-    return Array.from(map.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [sessions]);
-
-  const filtered = useMemo(() => {
-    if (!sessions) return [];
-    return personFilter === "all"
-      ? sessions
-      : sessions.filter((s: any) => s.member_id === personFilter);
-  }, [sessions, personFilter]);
-
-  const groups = useMemo(() => {
-    const m = new Map<string, any[]>();
-    for (const s of filtered) {
-      const key = (s.date as string).slice(0, 7); // YYYY-MM
-      if (!m.has(key)) m.set(key, []);
-      m.get(key)!.push(s);
+  const logsByMember = useMemo(() => {
+    const m = new Map<string, DWSession[]>();
+    for (const l of groupRows?.logs ?? []) {
+      if (!m.has(l.member_id)) m.set(l.member_id, []);
+      m.get(l.member_id)!.push(l);
     }
-    return Array.from(m.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filtered]);
+    return m;
+  }, [groupRows]);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["deep-work-feed-all"] });
+    qc.invalidateQueries({ queryKey: ["dw-month"] });
     qc.invalidateQueries({ queryKey: ["leaderboard"] });
   };
+
+  function todayPill(log: DWSession | undefined) {
+    if (!log) {
+      return (
+        <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
+          Not logged
+        </span>
+      );
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-xs font-semibold text-success">
+          ✓ Logged
+        </span>
+        {log.minutes ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">
+            <Clock className="h-3 w-3" /> {log.minutes}m
+          </span>
+        ) : null}
+        {log.topic ? (
+          <span className="truncate text-xs text-muted-foreground">{log.topic}</span>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <AppShell title="Deep Work">
       <NewSessionButton onCreated={invalidate} token={session?.token ?? null} />
 
-      <div className="mt-4">
-        <Select value={personFilter} onValueChange={setPersonFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by person" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Everyone</SelectItem>
-            {people.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="mt-5 space-y-6">
-        {groups.length === 0 && (
-          <p className="text-center text-sm text-muted-foreground">No sessions yet.</p>
-        )}
-        {groups.map(([month, items]) => (
-          <section key={month}>
-            <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {format(parseISO(`${month}-01`), "MMMM yyyy")}
-              <span className="ml-2 font-normal normal-case text-muted-foreground/70">
-                {items.length} {items.length === 1 ? "session" : "sessions"}
-              </span>
-            </h2>
+      <MemberFeed
+        title="Everyone's deep work"
+        members={groupRows?.members ?? []}
+        renderToday={(mid) => {
+          const log = logsByMember.get(mid)?.find((l) => l.date === today);
+          return todayPill(log);
+        }}
+        renderHistory={(mid) => {
+          const rows = logsByMember.get(mid) ?? [];
+          if (!rows.length)
+            return <p className="text-sm text-muted-foreground">No sessions this month.</p>;
+          return (
             <div className="space-y-3">
-              {items.map((s) => (
+              {rows.map((s) => (
                 <SessionCard
                   key={s.id}
                   session={s}
                   token={session?.token ?? null}
-                  memberId={session?.memberId ?? null}
+                  memberId={me ?? null}
                   onChanged={invalidate}
                 />
               ))}
             </div>
-          </section>
-        ))}
-      </div>
+          );
+        }}
+      />
     </AppShell>
   );
 }
@@ -172,7 +179,7 @@ function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="h-14 w-full text-base font-semibold">
-          <Plus className="mr-1 h-5 w-5" /> Log a session
+          <Plus className="mr-1 h-5 w-5" /> Log today's session
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
@@ -238,7 +245,7 @@ function SessionCard({
   memberId,
   onChanged,
 }: {
-  session: any;
+  session: DWSession;
   token: string | null;
   memberId: string | null;
   onChanged: () => void;
@@ -294,13 +301,10 @@ function SessionCard({
   const isOwn = memberId && session.member_id === memberId;
 
   return (
-    <article className="rounded-2xl border border-border bg-card p-4">
+    <article className="rounded-xl border border-border bg-card p-3">
       <header className="mb-2 flex items-baseline justify-between gap-2">
-        <div>
-          <div className="font-semibold">{session.members?.name}</div>
-          <div className="text-xs text-muted-foreground">
-            {format(parseISO(session.date), "EEE, MMM d, yyyy")}
-          </div>
+        <div className="text-xs text-muted-foreground">
+          {format(parseISO(session.date), "EEE, MMM d, yyyy")}
         </div>
         <div className="flex items-center gap-2">
           {session.minutes ? (
@@ -337,7 +341,7 @@ function SessionCard({
       </button>
       {showComments && (
         <div className="mt-3 space-y-2 border-t border-border pt-3">
-          {comments?.map((c) => (
+          {comments?.map((c: any) => (
             <div key={c.id} className="rounded-lg bg-secondary px-3 py-2 text-sm">
               <div className="text-xs font-semibold">{c.members?.name}</div>
               <div>{c.body}</div>

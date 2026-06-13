@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_audit: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          member_id: string | null
+          payload: Json | null
+          row_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          member_id?: string | null
+          payload?: Json | null
+          row_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          member_id?: string | null
+          payload?: Json | null
+          row_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       admin_settings: {
         Row: {
           id: number
@@ -114,6 +144,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "deep_work_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deep_work_bonuses: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          member_id: string
+          points: number
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          member_id: string
+          points?: number
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          member_id?: string
+          points?: number
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deep_work_bonuses_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
