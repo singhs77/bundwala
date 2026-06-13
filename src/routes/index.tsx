@@ -53,6 +53,7 @@ function Leaderboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "sleep_logs" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "macros_logs" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "deep_work" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "deep_work_bonuses" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "free_days" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "members" }, refresh)
       .subscribe();
