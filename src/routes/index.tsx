@@ -97,6 +97,11 @@ function Leaderboard() {
             .select("member_id,gym,deep_work,sleep,macros")
             .eq("month", ws),
         ]);
+      const { data: dwBonusData } = await supabase
+        .from("deep_work_bonuses")
+        .select("member_id,date,points")
+        .gte("date", ws)
+        .lte("date", we);
       return {
         teams: teams.data ?? [],
         members: members.data ?? [],
@@ -108,6 +113,7 @@ function Leaderboard() {
         freeDays: (freeDays.data ?? []).map((f) => f.date),
         targets: targets.data ?? [],
         snapshots: snapshots.data ?? [],
+        dwBonuses: (dwBonusData ?? []) as { member_id: string; date: string; points: number }[],
       };
     },
   });
@@ -139,6 +145,9 @@ function Leaderboard() {
         (g) => g.member_id === m.id && (g.status === "yes" || g.status === "home"),
       ).length;
       const dwCount = data.dw.filter((d) => d.member_id === m.id).length;
+      const dwBonusSum = data.dwBonuses
+        .filter((b) => b.member_id === m.id)
+        .reduce((sum, b) => sum + Number(b.points ?? 0), 0);
       // Sleep: count days where hit (>=7h) OR was a free day, but only days where they had entry or free day
       const sleepCount = month.filter((d) => {
         if (data.freeDays.includes(d)) return true;
@@ -169,7 +178,7 @@ function Leaderboard() {
       );
       const cat = {
         gym: gymCount * 0.2,
-        deep_work: dwCount * 0.3,
+        deep_work: Number((dwCount * 0.3 + dwBonusSum).toFixed(2)),
         sleep: sleepCount * 0.1,
         macros: macrosDates.size * 0.2,
         total: 0,
