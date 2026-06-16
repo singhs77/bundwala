@@ -24,6 +24,7 @@ type Member = {
   avatar_url: string | null;
   team_id: string | null;
   has_password: boolean | null;
+  is_demo?: boolean | null;
 };
 
 export function useMembersQuery() {
