@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe, useSession } from "@/lib/me";
@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Send, Clock, Trash2 } from "lucide-react";
+import { Plus, Send, Clock, Trash2, Play, Square, Pause } from "lucide-react";
 import { toISODate, startOfMonth, endOfMonth } from "@/lib/week";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -147,6 +147,61 @@ function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: 
   const [learnings, setLearnings] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Timer state — persists across dialog close so the timer keeps running
+  const [timerStart, setTimerStart] = useState<number | null>(null);
+  const [pausedElapsed, setPausedElapsed] = useState<number>(0); // ms accumulated while paused
+  const [startedAtLabel, setStartedAtLabel] = useState<string | null>(null);
+  const [endedAtLabel, setEndedAtLabel] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerStart !== null) {
+      tickRef.current = setInterval(() => setTick((t) => t + 1), 1000);
+      return () => {
+        if (tickRef.current) clearInterval(tickRef.current);
+      };
+    }
+  }, [timerStart]);
+
+  const elapsedMs =
+    (timerStart !== null ? Date.now() - timerStart : 0) + pausedElapsed;
+  const elapsedMin = Math.floor(elapsedMs / 60000);
+  const elapsedSec = Math.floor((elapsedMs % 60000) / 1000);
+  const isRunning = timerStart !== null;
+  const hasTimer = isRunning || pausedElapsed > 0;
+
+  function startTimer() {
+    const now = new Date();
+    setStartedAtLabel(format(now, "h:mm a"));
+    setEndedAtLabel(null);
+    setPausedElapsed(0);
+    setTimerStart(now.getTime());
+  }
+  function pauseTimer() {
+    if (timerStart === null) return;
+    setPausedElapsed((p) => p + (Date.now() - timerStart));
+    setTimerStart(null);
+  }
+  function resumeTimer() {
+    setTimerStart(Date.now());
+  }
+  function stopTimer() {
+    const totalMs =
+      (timerStart !== null ? Date.now() - timerStart : 0) + pausedElapsed;
+    setTimerStart(null);
+    setPausedElapsed(totalMs);
+    setEndedAtLabel(format(new Date(), "h:mm a"));
+    const mins = Math.max(1, Math.round(totalMs / 60000));
+    setMinutes(String(mins));
+  }
+  function resetTimer() {
+    setTimerStart(null);
+    setPausedElapsed(0);
+    setStartedAtLabel(null);
+    setEndedAtLabel(null);
+  }
+
   const create = useMutation({
     mutationFn: async () => {
       if (!token) throw new Error("Not signed in");
@@ -168,6 +223,7 @@ function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: 
       setMinutes("");
       setLearnings("");
       setNotes("");
+      resetTimer();
       setOpen(false);
       onCreated();
       toast.success("Logged");
@@ -187,6 +243,62 @@ function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: 
           <DialogTitle>New deep work session</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {/* Built-in timer */}
+          <div className="rounded-xl border border-border bg-secondary/40 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Timer
+              </Label>
+              {hasTimer && (
+                <button
+                  type="button"
+                  onClick={resetTimer}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-mono text-3xl font-bold tabular-nums">
+                {String(elapsedMin).padStart(2, "0")}:{String(elapsedSec).padStart(2, "0")}
+              </div>
+              <div className="flex gap-2">
+                {!isRunning && !hasTimer && (
+                  <Button type="button" onClick={startTimer} size="sm">
+                    <Play className="mr-1 h-4 w-4" /> Start
+                  </Button>
+                )}
+                {isRunning && (
+                  <>
+                    <Button type="button" onClick={pauseTimer} size="sm" variant="secondary">
+                      <Pause className="mr-1 h-4 w-4" /> Pause
+                    </Button>
+                    <Button type="button" onClick={stopTimer} size="sm" variant="destructive">
+                      <Square className="mr-1 h-4 w-4" /> Stop
+                    </Button>
+                  </>
+                )}
+                {!isRunning && hasTimer && (
+                  <>
+                    <Button type="button" onClick={resumeTimer} size="sm">
+                      <Play className="mr-1 h-4 w-4" /> Resume
+                    </Button>
+                    <Button type="button" onClick={stopTimer} size="sm" variant="destructive">
+                      <Square className="mr-1 h-4 w-4" /> Stop
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            {(startedAtLabel || endedAtLabel) && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                {startedAtLabel && <>Started {startedAtLabel}</>}
+                {endedAtLabel && <> · Ended {endedAtLabel}</>}
+              </div>
+            )}
+          </div>
+
           <div>
             <Label htmlFor="topic">Topic</Label>
             <Input
