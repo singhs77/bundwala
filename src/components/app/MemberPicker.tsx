@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { setSession, useMe, useSession, clearSession } from "@/lib/me";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, UserCircle2, Lock, Pencil, LogOut, Upload } from "lucide-react";
+import { ChevronDown, UserCircle2, Lock, Pencil, LogOut, Upload, Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   Dialog,
@@ -27,13 +27,18 @@ type Member = {
 };
 
 export function useMembersQuery() {
+  const session = useSession();
+  const me = session?.memberId ?? null;
   return useQuery({
-    queryKey: ["members"],
+    queryKey: ["members", me],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("members")
-        .select("id, name, avatar_url, team_id, has_password, teams(*)")
+        .select("id, name, avatar_url, team_id, has_password, is_demo, teams(*)")
         .order("name");
+      // Hide demo members from everyone except the demo user themselves.
+      q = me ? q.or(`is_demo.eq.false,id.eq.${me}`) : q.eq("is_demo", false);
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -368,6 +373,21 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
   const session = useSession();
   const { data: members, isLoading } = useMembersQuery();
   const [pending, setPending] = useState<Member | null>(null);
+  const [demoBusy, setDemoBusy] = useState(false);
+
+  const tryDemo = async () => {
+    setDemoBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("demo_login");
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row?.token || !row?.member_id) throw new Error("No demo session returned");
+      setSession({ memberId: row.member_id, token: row.token });
+    } catch (e: any) {
+      toast.error(String(e.message || e));
+      setDemoBusy(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -401,6 +421,27 @@ export function MemberGate({ children }: { children: React.ReactNode }) {
               </Button>
             );
           })}
+        </div>
+        <div className="w-full max-w-sm">
+          <div className="relative my-2 flex items-center">
+            <div className="flex-1 border-t border-border" />
+            <span className="mx-3 text-xs uppercase tracking-wider text-muted-foreground">
+              Just looking?
+            </span>
+            <div className="flex-1 border-t border-border" />
+          </div>
+          <Button
+            variant="outline"
+            className="h-12 w-full"
+            disabled={demoBusy}
+            onClick={tryDemo}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            {demoBusy ? "Loading demo…" : "Try the demo (no signup)"}
+          </Button>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            Sandboxed account. Your activity here doesn't affect real members and resets daily.
+          </p>
         </div>
         <PasswordPrompt
           member={pending}
