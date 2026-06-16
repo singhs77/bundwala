@@ -84,7 +84,7 @@ function SleepPage() {
       const me_ = toISODate(endOfMonth(new Date()));
       const [{ data: members }, { data: logs }, { data: targets }, { data: freeDays }] =
         await Promise.all([
-          supabase.from("members").select("id,name"),
+          supabase.from("members").select("id,name").eq("is_demo", false),
           supabase
             .from("sleep_logs")
             .select("id,member_id,date,sleep_time,wake_time,hours,free_day")

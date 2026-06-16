@@ -381,6 +381,7 @@ export type Database = {
           created_at: string
           has_password: boolean
           id: string
+          is_demo: boolean
           name: string
           team_id: string | null
         }
@@ -390,6 +391,7 @@ export type Database = {
           created_at?: string
           has_password?: boolean
           id?: string
+          is_demo?: boolean
           name: string
           team_id?: string | null
         }
@@ -399,6 +401,7 @@ export type Database = {
           created_at?: string
           has_password?: boolean
           id?: string
+          is_demo?: boolean
           name?: string
           team_id?: string | null
         }
@@ -695,6 +698,13 @@ export type Database = {
         Args: { _date: string; _token: string }
         Returns: undefined
       }
+      demo_login: {
+        Args: never
+        Returns: {
+          member_id: string
+          token: string
+        }[]
+      }
       get_notification_settings: {
         Args: never
         Returns: {
@@ -783,6 +793,8 @@ export type Database = {
         Args: { _member_id: string; _password: string }
         Returns: string
       }
+      reset_demo_data: { Args: never; Returns: undefined }
+      trigger_demo_reset: { Args: never; Returns: undefined }
       update_push_reminder: {
         Args: {
           _enabled: boolean

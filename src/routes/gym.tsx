@@ -95,7 +95,7 @@ function GymPage() {
     queryKey: ["gym-month", monthStart, monthEnd],
     queryFn: async () => {
       const [{ data: members }, { data: logs }] = await Promise.all([
-        supabase.from("members").select("id,name"),
+        supabase.from("members").select("id,name").eq("is_demo", false),
         supabase
           .from("gym_logs")
           .select("id,member_id,date,status")

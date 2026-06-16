@@ -136,7 +136,7 @@ function MacrosPage() {
       const ms = toISODate(startOfMonth(new Date()));
       const me_ = toISODate(endOfMonth(new Date()));
       const [{ data: members }, { data: logs }] = await Promise.all([
-        supabase.from("members").select("id,name"),
+        supabase.from("members").select("id,name").eq("is_demo", false),
         supabase
           .from("macros_logs")
           .select("id,member_id,date,calories,protein,carbs,fat")
