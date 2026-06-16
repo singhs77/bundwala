@@ -51,7 +51,7 @@ function DeepWorkPage() {
     queryKey: ["dw-month", ms, me_],
     queryFn: async () => {
       const [{ data: members }, { data: logs }] = await Promise.all([
-        supabase.from("members").select("id,name"),
+        supabase.from("members").select("id,name").eq("is_demo", false),
         supabase
           .from("deep_work")
           .select("*")
