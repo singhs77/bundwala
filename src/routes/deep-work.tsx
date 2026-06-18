@@ -21,6 +21,7 @@ import { toISODate, startOfMonth, endOfMonth } from "@/lib/week";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { MemberFeed } from "@/components/app/MemberFeed";
+import { handleRpcError } from "@/lib/rpc";
 
 export const Route = createFileRoute("/deep-work")({
   head: () => ({ meta: [{ title: "Deep Work — Group Tracker" }] }),
@@ -228,7 +229,7 @@ function NewSessionButton({ onCreated, token }: { onCreated: () => void; token: 
       onCreated();
       toast.success("Logged");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(handleRpcError(e)),
   });
 
   return (
@@ -407,7 +408,7 @@ function SessionCard({
       toast.success("Session deleted");
       onChanged();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(handleRpcError(e)),
   });
 
   const isOwn = memberId && session.member_id === memberId;

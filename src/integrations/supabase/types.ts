@@ -794,6 +794,7 @@ export type Database = {
         Returns: string
       }
       reset_demo_data: { Args: never; Returns: undefined }
+      touch_session: { Args: { _token: string }; Returns: undefined }
       trigger_demo_reset: { Args: never; Returns: undefined }
       update_push_reminder: {
         Args: {

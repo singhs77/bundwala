@@ -9,6 +9,7 @@ import { toISODate, startOfMonth, endOfMonth, daysOfMonth, formatMonth } from "@
 import { toast } from "sonner";
 import { useMemo, useState } from "react";
 import { MemberFeed } from "@/components/app/MemberFeed";
+import { handleRpcError } from "@/lib/rpc";
 
 export const Route = createFileRoute("/gym")({
   head: () => ({ meta: [{ title: "Gym — Group Tracker" }] }),
@@ -144,7 +145,7 @@ function GymPage() {
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(handleRpcError(e)),
   });
 
   const selectedLog = logs?.find((l) => l.date === selectedDate);

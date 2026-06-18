@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { withinTimeBuffer } from "@/lib/score";
 
 import { MemberFeed } from "@/components/app/MemberFeed";
+import { handleRpcError } from "@/lib/rpc";
 
 export const Route = createFileRoute("/sleep")({
   head: () => ({ meta: [{ title: "Sleep — Group Tracker" }] }),
@@ -124,7 +125,7 @@ function SleepPage() {
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(handleRpcError(e)),
   });
 
 

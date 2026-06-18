@@ -10,6 +10,10 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
+import { useEffect } from "react";
+import { getSession } from "@/lib/me";
+import { supabase } from "@/integrations/supabase/client";
+import { handleRpcError } from "@/lib/rpc";
 
 function NotFoundComponent() {
   return (
@@ -97,6 +101,15 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    const s = getSession();
+    if (!s) return;
+    supabase
+      .rpc("touch_session", { _token: s.token } as never)
+      .then(({ error }) => {
+        if (error) handleRpcError(error);
+      });
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
