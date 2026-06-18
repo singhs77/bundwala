@@ -98,11 +98,13 @@ function PasswordPrompt({
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
 
   const reset = () => {
     setPw("");
     setConfirm("");
     setBusy(false);
+    setResetBusy(false);
   };
 
   const submit = async () => {
@@ -140,6 +142,23 @@ function PasswordPrompt({
       const msg = String(e.message || e);
       toast.error(msg.includes("wrong_password") ? "Wrong password" : msg);
       setBusy(false);
+    }
+  };
+
+  const requestReset = async () => {
+    if (!member) return;
+    setResetBusy(true);
+    try {
+      const { error } = await supabase.rpc("request_password_reset", {
+        _member_id: member.id,
+      } as never);
+      if (error) throw error;
+      toast.success("Reset request sent — ask an admin to clear your password.");
+      reset();
+      onClose();
+    } catch (e: any) {
+      toast.error(String(e.message || e));
+      setResetBusy(false);
     }
   };
 
@@ -181,10 +200,22 @@ function PasswordPrompt({
             </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
           <Button onClick={submit} disabled={busy} className="w-full">
             {isSetup ? "Set password & continue" : "Sign in"}
           </Button>
+          {!isSetup && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+              onClick={requestReset}
+              disabled={resetBusy}
+            >
+              {resetBusy ? "Sending…" : "Forgot password?"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -472,6 +472,45 @@ export type Database = {
         }
         Relationships: []
       }
+      password_reset_requests: {
+        Row: {
+          id: string
+          member_id: string
+          requested_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "password_reset_requests_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "password_reset_requests_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -637,9 +676,22 @@ export type Database = {
         Args: { _date: string; _label: string; _password: string }
         Returns: undefined
       }
+      admin_clear_member_password: {
+        Args: { _member_id: string; _password: string }
+        Returns: undefined
+      }
       admin_delete_announcement: {
         Args: { _id: string; _password: string }
         Returns: undefined
+      }
+      admin_list_password_resets: {
+        Args: { _password: string }
+        Returns: {
+          id: string
+          member_id: string
+          member_name: string
+          requested_at: string
+        }[]
       }
       admin_list_subscriptions: {
         Args: { _password: string }
@@ -792,6 +844,10 @@ export type Database = {
       member_verify_password: {
         Args: { _member_id: string; _password: string }
         Returns: string
+      }
+      request_password_reset: {
+        Args: { _member_id: string }
+        Returns: undefined
       }
       reset_demo_data: { Args: never; Returns: undefined }
       touch_session: { Args: { _token: string }; Returns: undefined }

@@ -152,8 +152,85 @@ function AdminPage() {
       <BroadcastSection />
       <DailyReminderSection />
       <AnnouncementsSection />
+      <PasswordResetsSection adminPw={adminPw} />
       <ChangePasswordSection />
     </AppShell>
+  );
+}
+
+function PasswordResetsSection({ adminPw }: { adminPw: string }) {
+  const qc = useQueryClient();
+  const { data: requests } = useQuery({
+    queryKey: ["password_resets", adminPw],
+    queryFn: async () => {
+      if (!adminPw) return [];
+      const { data, error } = await supabase.rpc("admin_list_password_resets", {
+        _password: adminPw,
+      } as never);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        member_id: string;
+        member_name: string;
+        requested_at: string;
+      }>;
+    },
+    enabled: !!adminPw,
+  });
+
+  const clear = useMutation({
+    mutationFn: async (memberId: string) => {
+      if (!adminPw) throw new Error("Admin password required");
+      const { error } = await supabase.rpc("admin_clear_member_password", {
+        _password: adminPw,
+        _member_id: memberId,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["password_resets"] });
+      toast.success("Password cleared — member can set a new one on next login.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold text-muted-foreground">Password reset requests</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Enter the admin password above to load. Clearing a member's password also signs them out
+        of any active sessions; they pick a new password on next login.
+      </p>
+      {!adminPw ? (
+        <p className="mt-3 text-xs text-muted-foreground">Enter admin password to view requests.</p>
+      ) : !requests || requests.length === 0 ? (
+        <p className="mt-3 text-xs text-muted-foreground">No open requests.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-border">
+          {requests.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{r.member_name}</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {new Date(r.requested_at).toLocaleString()}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  if (!window.confirm(`Clear password for ${r.member_name}?`)) return;
+                  clear.mutate(r.member_id);
+                }}
+                disabled={clear.isPending}
+              >
+                Clear password
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
