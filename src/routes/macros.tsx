@@ -99,7 +99,7 @@ function MacrosPage() {
       qc.invalidateQueries({ queryKey: ["member-logs"] });
       toast.success("Goal saved");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(handleRpcError(e)),
   });
 
   const { data: weekRows } = useQuery({
