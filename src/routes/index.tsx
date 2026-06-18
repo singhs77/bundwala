@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Trophy, Skull } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Trophy, Skull, Crown, Medal } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -231,53 +231,17 @@ function Leaderboard() {
     return worst;
   }, [data, scores]);
 
-  const lowestDW = useMemo(() => {
-    if (!data) return null;
+  const podium = useMemo(() => {
+    if (!data) return [] as { name: string; total: number }[];
     const freeAgentTeamIds = new Set(
       data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
     );
-    let worst: { name: string; score: number } | null = null;
-    for (const m of data.members) {
-      if (!m.team_id) continue;
-      if (freeAgentTeamIds.has(m.team_id)) continue;
-      const s = scores.get(m.id);
-      if (!s) continue;
-      if (!worst || s.deep_work < worst.score) worst = { name: m.name, score: s.deep_work };
-    }
-    return worst;
-  }, [data, scores]);
-
-  const lowestSleep = useMemo(() => {
-    if (!data) return null;
-    const freeAgentTeamIds = new Set(
-      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
-    );
-    let worst: { name: string; score: number } | null = null;
-    for (const m of data.members) {
-      if (!m.team_id) continue;
-      if (freeAgentTeamIds.has(m.team_id)) continue;
-      const s = scores.get(m.id);
-      if (!s) continue;
-      if (!worst || s.sleep < worst.score) worst = { name: m.name, score: s.sleep };
-    }
-    return worst;
-  }, [data, scores]);
-
-  const leastHealthy = useMemo(() => {
-    if (!data) return null;
-    const freeAgentTeamIds = new Set(
-      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
-    );
-    let worst: { name: string; score: number; gym: number; macros: number } | null = null;
-    for (const m of data.members) {
-      if (!m.team_id) continue;
-      if (freeAgentTeamIds.has(m.team_id)) continue;
-      const s = scores.get(m.id);
-      if (!s) continue;
-      const avg = (s.gym + s.macros) / 2;
-      if (!worst || avg < worst.score) worst = { name: m.name, score: avg, gym: s.gym, macros: s.macros };
-    }
-    return worst;
+    const ranked = data.members
+      .filter((m) => m.team_id && !freeAgentTeamIds.has(m.team_id))
+      .map((m) => ({ name: m.name, total: scores.get(m.id)?.total ?? 0 }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 3);
+    return ranked;
   }, [data, scores]);
 
 
@@ -299,9 +263,81 @@ function Leaderboard() {
 
       <Announcements />
 
+      {podium.length > 0 && (
+        <div className="mb-3 rounded-2xl border border-border bg-card px-3 py-4">
+          <div className="mb-3 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Top 3 this month
+          </div>
+          <div className="grid grid-cols-3 items-end gap-2">
+            {(() => {
+              const second = podium[1];
+              const first = podium[0];
+              const third = podium[2];
+              const Tier = ({
+                m,
+                place,
+              }: {
+                m: { name: string; total: number } | undefined;
+                place: 1 | 2 | 3;
+              }) => {
+                if (!m) return <div />;
+                const cfg =
+                  place === 1
+                    ? {
+                        h: "h-24",
+                        ring: "border-amber-400/70 bg-amber-400/15",
+                        chip: "bg-amber-400/25 text-amber-700 dark:text-amber-300",
+                        icon: <Crown className="h-4 w-4 text-amber-500" />,
+                        label: "1st",
+                      }
+                    : place === 2
+                      ? {
+                          h: "h-16",
+                          ring: "border-slate-400/60 bg-slate-400/10",
+                          chip: "bg-slate-400/25 text-slate-700 dark:text-slate-200",
+                          icon: <Medal className="h-4 w-4 text-slate-400" />,
+                          label: "2nd",
+                        }
+                      : {
+                          h: "h-12",
+                          ring: "border-orange-500/50 bg-orange-500/10",
+                          chip: "bg-orange-500/20 text-orange-700 dark:text-orange-300",
+                          icon: <Medal className="h-4 w-4 text-orange-500" />,
+                          label: "3rd",
+                        };
+                return (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="flex items-center gap-1">{cfg.icon}</div>
+                    <div className="w-full truncate px-1 text-center text-xs font-semibold">
+                      {m.name}
+                    </div>
+                    <div
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${cfg.chip}`}
+                    >
+                      {m.total.toFixed(1)}
+                    </div>
+                    <div
+                      className={`flex w-full ${cfg.h} items-start justify-center rounded-t-lg border-x border-t ${cfg.ring} pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`}
+                    >
+                      {cfg.label}
+                    </div>
+                  </div>
+                );
+              };
+              return (
+                <>
+                  <Tier m={second} place={2} />
+                  <Tier m={first} place={1} />
+                  <Tier m={third} place={3} />
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {dogshit && (
-        <>
-          <div className="mb-3 flex items-center justify-between rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3">
+        <div className="mb-3 flex items-center justify-between rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3">
             <div className="flex items-center gap-2">
               <Skull className="h-4 w-4 text-destructive" />
               <div>
@@ -314,43 +350,7 @@ function Leaderboard() {
             <div className="rounded-full bg-background/60 px-3 py-1 text-sm font-bold tabular-nums">
               {dogshit.total.toFixed(1)}
             </div>
-          </div>
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            {lowestDW && (
-              <div className="flex flex-col gap-1 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                  Lowest deepwork
-                </div>
-                <div className="text-xs font-semibold truncate">{lowestDW.name}</div>
-                <div className="self-start rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-amber-700 dark:text-amber-300">
-                  {lowestDW.score.toFixed(1)}
-                </div>
-              </div>
-            )}
-            {lowestSleep && (
-              <div className="flex flex-col gap-1 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                  Lowest sleep
-                </div>
-                <div className="text-xs font-semibold truncate">{lowestSleep.name}</div>
-                <div className="self-start rounded-full bg-sky-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-700 dark:text-sky-300">
-                  {lowestSleep.score.toFixed(1)}
-                </div>
-              </div>
-            )}
-            {leastHealthy && (
-              <div className="flex flex-col gap-1 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  Least healthy (gym + macros)
-                </div>
-                <div className="text-xs font-semibold truncate">{leastHealthy.name}</div>
-                <div className="self-start rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                  {leastHealthy.score.toFixed(1)}
-                </div>
-              </div>
-            )}
-          </div>
-        </>
+        </div>
       )}
 
       {isLoading || !data ? (
