@@ -1,0 +1,1 @@
+Always plan first — never jump straight to building. Use plan--create for every request, even tiny ones, and wait for approval before editing files.
