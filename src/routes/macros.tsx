@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { startOfMonth, endOfMonth, toISODate, startOfWeek, endOfWeek, formatRange } from "@/lib/week";
 import { toast } from "sonner";
 import { MemberFeed } from "@/components/app/MemberFeed";
+import { handleRpcError } from "@/lib/rpc";
 
 export const Route = createFileRoute("/macros")({
   head: () => ({ meta: [{ title: "Macros — Group Tracker" }] }),
@@ -180,7 +181,7 @@ function MacrosPage() {
       qc.invalidateQueries({ queryKey: ["leaderboard"] });
       toast.success("Saved");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(handleRpcError(e)),
   });
 
   const weekAvgs: Record<NumericField, number> = {} as any;

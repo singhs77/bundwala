@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { withinTimeBuffer } from "@/lib/score";
 
 import { MemberFeed } from "@/components/app/MemberFeed";
+import { handleRpcError } from "@/lib/rpc";
 
 export const Route = createFileRoute("/sleep")({
   head: () => ({ meta: [{ title: "Sleep — Group Tracker" }] }),
