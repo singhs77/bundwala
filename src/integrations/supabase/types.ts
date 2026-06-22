@@ -819,6 +819,13 @@ export type Database = {
       }
       mark_global_reminder_sent: { Args: never; Returns: undefined }
       mark_reminder_sent: { Args: { _id: string }; Returns: undefined }
+      member_last_activity: {
+        Args: { _member_id: string }
+        Returns: {
+          audit_started_at: string
+          last_at: string
+        }[]
+      }
       member_logout: { Args: { _token: string }; Returns: undefined }
       member_rename: {
         Args: { _new_name: string; _token: string }
