@@ -79,7 +79,7 @@ function MemberLogsPage() {
     queryFn: async () => {
       const [member, teams, gym, dw, sleep, target, macrosMonth, macrosWeek, freeDays] =
         await Promise.all([
-          supabase.from("members").select("id,name,team_id,avatar_url,calorie_goal").eq("id", memberId).maybeSingle(),
+          supabase.from("members").select("id,name,team_id,avatar_url,calorie_goal,last_login_at").eq("id", memberId).maybeSingle(),
           supabase.from("teams").select("id,name"),
           supabase.from("gym_logs").select("date,status").eq("member_id", memberId).gte("date", ms).lte("date", me_),
           supabase.from("deep_work").select("id,date,topic,minutes,learnings,personal_notes").eq("member_id", memberId).gte("date", ms).lte("date", me_).order("date", { ascending: false }),
@@ -234,6 +234,18 @@ function MemberLogsPage() {
           <div className="min-w-0 flex-1">
             <div className="truncate text-base font-semibold">{m.name}</div>
             <div className="text-xs text-muted-foreground">{team?.name ?? "No team"}</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              Last on app:{" "}
+              {(m as any).last_login_at
+                ? new Date((m as any).last_login_at).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                : "Never"}
+            </div>
           </div>
           <div className="rounded-full bg-primary/15 px-3 py-1 text-base font-bold tabular-nums text-primary">
             {scores.total.toFixed(1)}

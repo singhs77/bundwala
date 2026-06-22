@@ -382,6 +382,7 @@ export type Database = {
           has_password: boolean
           id: string
           is_demo: boolean
+          last_login_at: string | null
           name: string
           team_id: string | null
         }
@@ -392,6 +393,7 @@ export type Database = {
           has_password?: boolean
           id?: string
           is_demo?: boolean
+          last_login_at?: string | null
           name: string
           team_id?: string | null
         }
@@ -402,6 +404,7 @@ export type Database = {
           has_password?: boolean
           id?: string
           is_demo?: boolean
+          last_login_at?: string | null
           name?: string
           team_id?: string | null
         }
