@@ -77,9 +77,9 @@ function MemberLogsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["member-logs", memberId, ms, me_, ws, we],
     queryFn: async () => {
-      const [member, teams, gym, dw, sleep, target, macrosMonth, macrosWeek, freeDays] =
+      const [member, teams, gym, dw, sleep, target, macrosMonth, macrosWeek, freeDays, lastAct] =
         await Promise.all([
-          supabase.from("members").select("id,name,team_id,avatar_url,calorie_goal,last_login_at").eq("id", memberId).maybeSingle(),
+          supabase.from("members").select("id,name,team_id,avatar_url,calorie_goal").eq("id", memberId).maybeSingle(),
           supabase.from("teams").select("id,name"),
           supabase.from("gym_logs").select("date,status").eq("member_id", memberId).gte("date", ms).lte("date", me_),
           supabase.from("deep_work").select("id,date,topic,minutes,learnings,personal_notes").eq("member_id", memberId).gte("date", ms).lte("date", me_).order("date", { ascending: false }),
@@ -88,7 +88,9 @@ function MemberLogsPage() {
           supabase.from("macros_logs").select("date,calories,protein,carbs,fat,sugar,water").eq("member_id", memberId).gte("date", ms).lte("date", me_),
           supabase.from("macros_logs").select("date,calories,protein,carbs,fat,sugar,water").eq("member_id", memberId).gte("date", ws).lte("date", we),
           supabase.from("free_days").select("date").gte("date", ms).lte("date", me_),
+          (supabase as any).rpc("member_last_activity", { _member_id: memberId }),
         ]);
+      const lastRow = Array.isArray(lastAct?.data) ? lastAct.data[0] : null;
       return {
         member: member.data,
         teams: teams.data ?? [],
@@ -99,6 +101,8 @@ function MemberLogsPage() {
         macrosMonth: macrosMonth.data ?? [],
         macrosWeek: macrosWeek.data ?? [],
         freeDays: (freeDays.data ?? []).map((f) => f.date),
+        lastActivityAt: (lastRow?.last_at as string | null) ?? null,
+        auditStartedAt: (lastRow?.audit_started_at as string | null) ?? null,
       };
     },
   });
