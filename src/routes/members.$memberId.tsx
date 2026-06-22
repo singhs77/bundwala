@@ -240,15 +240,22 @@ function MemberLogsPage() {
             <div className="text-xs text-muted-foreground">{team?.name ?? "No team"}</div>
             <div className="mt-0.5 text-[11px] text-muted-foreground">
               Last on app:{" "}
-              {(m as any).last_login_at
-                ? new Date((m as any).last_login_at).toLocaleString(undefined, {
+              {data.lastActivityAt
+                ? new Date(data.lastActivityAt).toLocaleString(undefined, {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
                     hour: "numeric",
                     minute: "2-digit",
                   })
-                : "Never"}
+                : data.auditStartedAt
+                  ? `Not logged on in past ${Math.max(
+                      1,
+                      Math.floor(
+                        (Date.now() - new Date(data.auditStartedAt).getTime()) / 86400000,
+                      ),
+                    )} days`
+                  : "Never"}
             </div>
           </div>
           <div className="rounded-full bg-primary/15 px-3 py-1 text-base font-bold tabular-nums text-primary">
