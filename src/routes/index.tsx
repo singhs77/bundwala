@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Skull, Crown, Medal } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Crown } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -202,15 +202,28 @@ function Leaderboard() {
 
   return (
     <AppShell title="Standings">
-      <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-card p-3">
-        <Button variant="ghost" size="icon" onClick={() => setAnchor((d) => shiftMonth(d, -1))}>
-          <ChevronLeft className="h-4 w-4" />
+      {/* Month Navigation */}
+      <nav className="mb-4 flex items-center justify-between rounded-xl border border-border bg-card/50 p-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-lg"
+          onClick={() => setAnchor((d) => shiftMonth(d, -1))}
+        >
+          <ChevronLeft className="h-5 w-5 text-muted-foreground" />
         </Button>
-        <div className="text-sm font-medium">{formatMonth(anchor)}</div>
-        <Button variant="ghost" size="icon" onClick={() => setAnchor((d) => shiftMonth(d, 1))}>
-          <ChevronRight className="h-4 w-4" />
+        <span className="text-sm font-medium uppercase tracking-widest text-foreground">
+          {formatMonth(anchor)}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-lg"
+          onClick={() => setAnchor((d) => shiftMonth(d, 1))}
+        >
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </Button>
-      </div>
+      </nav>
 
       <div className="mb-3">
         <PushSettings />
@@ -218,96 +231,119 @@ function Leaderboard() {
 
       <Announcements />
 
-      {podium.length > 0 && (
-        <div className="mb-3 rounded-2xl border border-border bg-card px-3 py-4">
-          <div className="mb-3 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Top 3 this month
+      {/* Most Dogshit Player Callout */}
+      {dogshit && (
+        <div className="relative mb-4 flex items-center gap-4 overflow-hidden rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
+          <div className="rounded-xl bg-destructive/20 p-3">
+            <AlertTriangle className="h-7 w-7 text-destructive" strokeWidth={1.5} />
           </div>
-          <div className="grid grid-cols-3 items-end gap-2">
-            {(() => {
-              const second = podium[1];
-              const first = podium[0];
-              const third = podium[2];
-              const Tier = ({
-                m,
-                place,
-              }: {
-                m: { name: string; total: number } | undefined;
-                place: 1 | 2 | 3;
-              }) => {
-                if (!m) return <div />;
-                const cfg =
-                  place === 1
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-tighter text-destructive/80">
+              Most Dogshit Player
+            </p>
+            <h3 className="truncate text-xl font-black uppercase tracking-tight text-destructive">
+              {dogshit.name}
+            </h3>
+            <p className="text-xs text-destructive/70">
+              {dogshit.total.toFixed(1)} pts · Absolute disgrace
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Top 3 Podium */}
+      {podium.length > 0 && (
+        <div className="mb-2 flex items-end justify-center gap-2 px-2 pb-1 pt-8">
+          {(() => {
+            const Tier = ({
+              m,
+              place,
+            }: {
+              m: { name: string; total: number } | undefined;
+              place: 1 | 2 | 3;
+            }) => {
+              if (!m) return <div className="flex-1" />;
+              const cfg =
+                place === 1
+                  ? {
+                      bar: "h-32 rounded-t-xl bg-card border-x border-t border-amber-500/40",
+                      ring: "h-16 w-16 border-amber-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]",
+                      ringText: "text-amber-500",
+                      badge: "bg-amber-500 w-6 h-6 text-base",
+                      label: "1",
+                      score: "text-2xl text-amber-500",
+                      scale: "scale-110",
+                      crown: true,
+                    }
+                  : place === 2
                     ? {
-                        h: "h-24",
-                        ring: "border-amber-400/70 bg-amber-400/15",
-                        chip: "bg-amber-400/25 text-amber-700 dark:text-amber-300",
-                        icon: <Crown className="h-4 w-4 text-amber-500" />,
-                        label: "1st",
+                        bar: "h-24 rounded-t-lg bg-card/60 border-x border-t border-border",
+                        ring: "h-14 w-14 border-slate-400",
+                        ringText: "text-slate-400",
+                        badge: "bg-slate-400 w-5 h-5 text-[10px]",
+                        label: "2",
+                        score: "text-lg text-slate-400",
+                        scale: "",
+                        crown: false,
                       }
-                    : place === 2
-                      ? {
-                          h: "h-16",
-                          ring: "border-slate-400/60 bg-slate-400/10",
-                          chip: "bg-slate-400/25 text-slate-700 dark:text-slate-200",
-                          icon: <Medal className="h-4 w-4 text-slate-400" />,
-                          label: "2nd",
-                        }
-                      : {
-                          h: "h-12",
-                          ring: "border-orange-500/50 bg-orange-500/10",
-                          chip: "bg-orange-500/20 text-orange-700 dark:text-orange-300",
-                          icon: <Medal className="h-4 w-4 text-orange-500" />,
-                          label: "3rd",
-                        };
-                return (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <div className="flex items-center gap-1">{cfg.icon}</div>
-                    <div className="w-full truncate px-1 text-center text-xs font-semibold">
-                      {m.name}
-                    </div>
+                    : {
+                        bar: "h-20 rounded-t-lg bg-card/60 border-x border-t border-border",
+                        ring: "h-14 w-14 border-orange-700",
+                        ringText: "text-orange-700 dark:text-orange-500",
+                        badge: "bg-orange-700 w-5 h-5 text-[10px]",
+                        label: "3",
+                        score: "text-lg text-orange-700 dark:text-orange-500",
+                        scale: "",
+                        crown: false,
+                      };
+              const initials = m.name
+                .split(" ")
+                .map((s) => s[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+              return (
+                <div className="flex flex-1 flex-col items-center">
+                  <div className={`relative mb-2 ${cfg.scale}`}>
+                    {cfg.crown && (
+                      <Crown className="absolute -top-5 left-1/2 h-5 w-5 -translate-x-1/2 text-amber-500" />
+                    )}
                     <div
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${cfg.chip}`}
+                      className={`flex items-center justify-center overflow-hidden rounded-full border-2 bg-muted ${cfg.ring}`}
                     >
-                      {m.total.toFixed(1)}
+                      <span className={`font-bold ${cfg.ringText}`}>{initials}</span>
                     </div>
                     <div
-                      className={`flex w-full ${cfg.h} items-start justify-center rounded-t-lg border-x border-t ${cfg.ring} pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`}
+                      className={`absolute -bottom-1 -right-1 flex items-center justify-center rounded-full border-2 border-background font-bold text-background ${cfg.badge}`}
                     >
                       {cfg.label}
                     </div>
                   </div>
-                );
-              };
-              return (
-                <>
-                  <Tier m={second} place={2} />
-                  <Tier m={first} place={1} />
-                  <Tier m={third} place={3} />
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
-      {dogshit && (
-        <div className="mb-3 flex items-center justify-between rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Skull className="h-4 w-4 text-destructive" />
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-destructive">
-                  Most Dogshit Player
+                  <div
+                    className={`flex w-full flex-col items-center justify-center ${cfg.bar}`}
+                  >
+                    <span className="truncate px-1 text-xs font-bold text-foreground">
+                      {m.name}
+                    </span>
+                    <span className={`font-black tabular-nums ${cfg.score}`}>
+                      {m.total.toFixed(1)}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-sm font-semibold">{dogshit.name}</div>
-              </div>
-            </div>
-            <div className="rounded-full bg-background/60 px-3 py-1 text-sm font-bold tabular-nums">
-              {dogshit.total.toFixed(1)}
-            </div>
+              );
+            };
+            return (
+              <>
+                <Tier m={podium[1]} place={2} />
+                <Tier m={podium[0]} place={1} />
+                <Tier m={podium[2]} place={3} />
+              </>
+            );
+          })()}
         </div>
       )}
 
+      {/* Leaderboard Table */}
       {isLoading || !data ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -316,33 +352,33 @@ function Leaderboard() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <div className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 bg-card/50 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             <div className="text-right">#</div>
-            <div></div>
-            <div className="w-9 text-right">Gym</div>
-            <div className="w-9 text-right">DW</div>
-            <div className="w-9 text-right">Sleep</div>
-            <div className="w-9 text-right">Macros</div>
-            <div className="w-10 text-right text-foreground">Total</div>
+            <div>Player</div>
+            <div className="w-9 text-center">GYM</div>
+            <div className="w-9 text-center">DW</div>
+            <div className="w-9 text-center">SL</div>
+            <div className="w-9 text-center">MC</div>
+            <div className="w-10 text-right text-foreground">TOT</div>
           </div>
-          <ul className="divide-y divide-border border-t border-border">
+          <ul className="divide-y divide-border">
             {ranked.map((m, i) => {
               return (
-                <li key={m.id}>
+                <li key={m.id} className={i % 2 === 0 ? "bg-muted/20" : ""}>
                   <Link
                     to="/members/$memberId"
                     params={{ memberId: m.id }}
-                    className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums transition-colors hover:bg-accent/50"
+                    className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-3 text-sm tabular-nums transition-colors hover:bg-accent/40"
                   >
-                    <div className="text-right text-muted-foreground">{i + 1}</div>
+                    <div className="text-right text-xs font-bold text-muted-foreground">{i + 1}</div>
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate font-medium">{m.name}</span>
+                      <span className="truncate font-semibold">{m.name}</span>
                     </div>
-                    <div className="w-9 text-right text-muted-foreground">{m.gym.toFixed(1)}</div>
-                    <div className="w-9 text-right text-muted-foreground">{m.deep_work.toFixed(1)}</div>
-                    <div className="w-9 text-right text-muted-foreground">{m.sleep.toFixed(1)}</div>
-                    <div className="w-9 text-right text-muted-foreground">{m.macros.toFixed(1)}</div>
-                    <div className="w-10 text-right font-semibold">{m.total.toFixed(1)}</div>
+                    <div className="w-9 text-center text-xs text-muted-foreground">{m.gym.toFixed(1)}</div>
+                    <div className="w-9 text-center text-xs text-muted-foreground">{m.deep_work.toFixed(1)}</div>
+                    <div className="w-9 text-center text-xs text-muted-foreground">{m.sleep.toFixed(1)}</div>
+                    <div className="w-9 text-center text-xs text-muted-foreground">{m.macros.toFixed(1)}</div>
+                    <div className="w-10 text-right text-sm font-black text-foreground">{m.total.toFixed(1)}</div>
                   </Link>
                 </li>
               );
