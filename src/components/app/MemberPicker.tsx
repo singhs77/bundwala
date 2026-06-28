@@ -241,7 +241,6 @@ function RenameDialog({
   const session = useSession();
   const me = useMe();
   const { data: members } = useMembersQuery();
-  const qc = useQueryClient();
   const current = members?.find((m) => m.id === me) as Member | undefined;
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
