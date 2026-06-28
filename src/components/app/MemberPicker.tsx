@@ -142,7 +142,12 @@ function PasswordPrompt({
       reset();
     } catch (e: any) {
       const msg = String(e.message || e);
-      toast.error(msg.includes("wrong_password") ? "Wrong password" : msg);
+      if (msg.includes("banned:")) {
+        const idx = msg.indexOf("banned:");
+        toast.error(msg.slice(idx + "banned:".length).trim() || "Access removed.");
+      } else {
+        toast.error(msg.includes("wrong_password") ? "Wrong password" : msg);
+      }
       setBusy(false);
     }
   };
