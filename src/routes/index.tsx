@@ -338,79 +338,50 @@ function Leaderboard() {
           ))}
         </div>
       ) : (
-        <div className="space-y-3">
-          {data.teams.map((t) => {
-            const teamMembers = data.members.filter((m) => m.team_id === t.id);
-            const total = teamTotals.get(t.id) ?? 0;
-            const isLeader = t.id === leaderTeamId && total > 0;
-            const isOpen = openTeams[t.id] ?? false;
-            return (
-              <Collapsible
-                key={t.id}
-                open={isOpen}
-                onOpenChange={(o) => setOpenTeams((prev) => ({ ...prev, [t.id]: o }))}
-                className={`overflow-hidden rounded-2xl border bg-card ${
-                  isLeader ? "border-primary/60 shadow-[0_0_0_1px_var(--color-primary)]" : "border-border"
-                }`}
-              >
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+            <div className="text-right">#</div>
+            <div></div>
+            <div className="w-9 text-right">Gym</div>
+            <div className="w-9 text-right">DW</div>
+            <div className="w-9 text-right">Sleep</div>
+            <div className="w-9 text-right">Macros</div>
+            <div className="w-10 text-right text-foreground">Total</div>
+          </div>
+          <ul className="divide-y divide-border border-t border-border">
+            {ranked.map((m, i) => {
+              const streak = streakByMember.get(m.id) ?? 0;
+              const hotSeat = streak >= 3;
+              return (
+                <li key={m.id}>
+                  <Link
+                    to="/members/$memberId"
+                    params={{ memberId: m.id }}
+                    className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums transition-colors hover:bg-accent/50"
                   >
-                    <div className="flex items-center gap-2">
-                      {isLeader && <Trophy className="h-4 w-4 text-primary" />}
-                      <h2 className="text-base font-semibold">{t.name}</h2>
-                      <span className="text-xs text-muted-foreground">
-                        {teamMembers.length} {teamMembers.length === 1 ? "member" : "members"}
-                      </span>
+                    <div className="text-right text-muted-foreground">{i + 1}</div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">{m.name}</span>
+                      {hotSeat && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                          <Flame className="h-3 w-3" />
+                          Under hot seat
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
-                        {total.toFixed(1)}
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${
-                          isOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </div>
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 gap-y-1 px-4 pb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <div></div>
-                    <div className="w-9 text-right">Gym</div>
-                    <div className="w-9 text-right">DW</div>
-                    <div className="w-9 text-right">Sleep</div>
-                    <div className="w-9 text-right">Macros</div>
-                    <div className="w-10 text-right text-foreground">Total</div>
-                  </div>
-                  <ul className="divide-y divide-border border-t border-border">
-                  {teamMembers.map((m) => {
-                    const s = scores.get(m.id) ?? { gym: 0, deep_work: 0, sleep: 0, macros: 0, total: 0 };
-                    return (
-                      <li key={m.id}>
-                        <Link
-                          to="/members/$memberId"
-                          params={{ memberId: m.id }}
-                          className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums transition-colors hover:bg-accent/50"
-                        >
-                          <div className="truncate font-medium">{m.name}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.gym.toFixed(1)}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.deep_work.toFixed(1)}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.sleep.toFixed(1)}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.macros.toFixed(1)}</div>
-                          <div className="w-10 text-right font-semibold">{s.total.toFixed(1)}</div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                  </ul>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
+                    <div className="w-9 text-right text-muted-foreground">{m.gym.toFixed(1)}</div>
+                    <div className="w-9 text-right text-muted-foreground">{m.deep_work.toFixed(1)}</div>
+                    <div className="w-9 text-right text-muted-foreground">{m.sleep.toFixed(1)}</div>
+                    <div className="w-9 text-right text-muted-foreground">{m.macros.toFixed(1)}</div>
+                    <div className="w-10 text-right font-semibold">{m.total.toFixed(1)}</div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+            Miss 3 days of gym / sleep / macros / deep work in a row → hot seat. Miss 5 in a row → removed.
+          </p>
         </div>
       )}
     </AppShell>
