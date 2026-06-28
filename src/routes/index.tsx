@@ -245,7 +245,18 @@ function Leaderboard() {
               {dogshit.name}
             </h3>
             <p className="text-xs text-destructive/70">
-              {dogshit.total.toFixed(1)} pts · Absolute disgrace
+              {dogshit.total.toFixed(1)} pts · Needs work on: {" "}
+              {(
+                [
+                  ["gym", dogshit.gym],
+                  ["deep_work", dogshit.deep_work],
+                  ["sleep", dogshit.sleep],
+                  ["macros", dogshit.macros],
+                ] as [string, number][]
+              )
+                .sort((a, b) => a[1] - b[1])[0][0]
+                .replace("deep_work", "deep work")
+                .replace("macros", "macros")}
             </p>
           </div>
         </div>
