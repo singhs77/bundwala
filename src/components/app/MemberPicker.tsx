@@ -35,8 +35,10 @@ export function useMembersQuery() {
     queryFn: async () => {
       let q = supabase
         .from("members")
-        .select("id, name, avatar_url, team_id, has_password, is_demo, teams(*)")
+        .select("id, name, avatar_url, team_id, has_password, is_demo, is_banned, teams(*)")
         .order("name");
+      // Hide banned members entirely.
+      q = q.eq("is_banned", false);
       // Hide demo members from everyone except the demo user themselves.
       q = me ? q.or(`is_demo.eq.false,id.eq.${me}`) : q.eq("is_demo", false);
       const { data, error } = await q;
