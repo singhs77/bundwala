@@ -377,10 +377,12 @@ export type Database = {
       members: {
         Row: {
           avatar_url: string | null
+          ban_message: string | null
           calorie_goal: number | null
           created_at: string
           has_password: boolean
           id: string
+          is_banned: boolean
           is_demo: boolean
           last_login_at: string | null
           name: string
@@ -388,10 +390,12 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          ban_message?: string | null
           calorie_goal?: number | null
           created_at?: string
           has_password?: boolean
           id?: string
+          is_banned?: boolean
           is_demo?: boolean
           last_login_at?: string | null
           name: string
@@ -399,10 +403,12 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          ban_message?: string | null
           calorie_goal?: number | null
           created_at?: string
           has_password?: boolean
           id?: string
+          is_banned?: boolean
           is_demo?: boolean
           last_login_at?: string | null
           name?: string
@@ -760,6 +766,7 @@ export type Database = {
           token: string
         }[]
       }
+      enforce_inactivity_bans: { Args: never; Returns: number }
       get_notification_settings: {
         Args: never
         Returns: {
@@ -854,6 +861,14 @@ export type Database = {
       member_verify_password: {
         Args: { _member_id: string; _password: string }
         Returns: string
+      }
+      members_inactivity_overview: {
+        Args: never
+        Returns: {
+          member_id: string
+          worst_category: string
+          worst_streak: number
+        }[]
       }
       request_password_reset: {
         Args: { _member_id: string }
