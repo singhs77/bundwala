@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Trophy, Skull, Crown, Medal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Skull, Crown, Medal, Flame } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,11 +15,6 @@ import {
 import { sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { PushSettings } from "@/components/app/PushSettings";
 import { Announcements } from "@/components/app/Announcements";
 
@@ -35,8 +30,16 @@ function Leaderboard() {
   const ws = useMemo(() => toISODate(startOfMonth(anchor)), [anchor]);
   const we = useMemo(() => toISODate(endOfMonth(anchor)), [anchor]);
   const daysInMonth = useMemo(() => daysOfMonth(anchor).length, [anchor]);
-  const [openTeams, setOpenTeams] = useState<Record<string, boolean>>({});
   const qc = useQueryClient();
+
+  // Auto-enforce removals on mount (idempotent server-side).
+  useEffect(() => {
+    supabase.rpc("enforce_inactivity_bans" as never).then(() => {
+      qc.invalidateQueries({ queryKey: ["leaderboard"] });
+      qc.invalidateQueries({ queryKey: ["inactivity"] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Realtime: refresh standings whenever any activity changes
   useEffect(() => {
@@ -66,10 +69,13 @@ function Leaderboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", ws, we],
     queryFn: async () => {
-      const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets, snapshots] =
+      const [members, rules, gym, dw, sleep, macros, freeDays, targets, snapshots] =
         await Promise.all([
-          supabase.from("teams").select("*").order("sort_order"),
-          supabase.from("members").select("id, name, team_id").eq("is_demo", false),
+          supabase
+            .from("members")
+            .select("id, name")
+            .eq("is_demo", false)
+            .eq("is_banned", false),
           supabase.from("scoring_rules").select("*"),
           supabase
             .from("gym_logs")
@@ -104,7 +110,6 @@ function Leaderboard() {
         .gte("date", ws)
         .lte("date", we);
       return {
-        teams: teams.data ?? [],
         members: members.data ?? [],
         rules: (rules.data ?? []) as Rule[],
         gym: gym.data ?? [],
@@ -118,6 +123,20 @@ function Leaderboard() {
       };
     },
   });
+
+  const { data: inactivity } = useQuery({
+    queryKey: ["inactivity"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("members_inactivity_overview" as never);
+      if (error) throw error;
+      return (data ?? []) as { member_id: string; worst_category: string; worst_streak: number }[];
+    },
+  });
+  const streakByMember = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of inactivity ?? []) m.set(r.member_id, Number(r.worst_streak ?? 0));
+    return m;
+  }, [inactivity]);
 
   const scores = useMemo(() => {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
@@ -190,59 +209,18 @@ function Leaderboard() {
     return result;
   }, [data, anchor, daysInMonth]);
 
-  const teamTotals = useMemo(() => {
-    if (!data) return new Map<string, number>();
-    const totals = new Map<string, number>();
-    for (const t of data.teams) totals.set(t.id, 0);
-    for (const m of data.members) {
-      if (!m.team_id) continue;
-      const s = scores.get(m.id);
-      if (!s) continue;
-      totals.set(m.team_id, Number(((totals.get(m.team_id) ?? 0) + s.total).toFixed(2)));
-    }
-    return totals;
+  const ranked = useMemo(() => {
+    if (!data) return [] as { id: string; name: string; total: number; gym: number; deep_work: number; sleep: number; macros: number }[];
+    return data.members
+      .map((m) => {
+        const s = scores.get(m.id) ?? { gym: 0, deep_work: 0, sleep: 0, macros: 0, total: 0 };
+        return { id: m.id, name: m.name, ...s };
+      })
+      .sort((a, b) => b.total - a.total);
   }, [data, scores]);
 
-  const leaderTeamId = useMemo(() => {
-    let max = -1;
-    let id: string | null = null;
-    teamTotals.forEach((v, k) => {
-      if (v > max) {
-        max = v;
-        id = k;
-      }
-    });
-    return id;
-  }, [teamTotals]);
-
-  const dogshit = useMemo(() => {
-    if (!data) return null;
-    const freeAgentTeamIds = new Set(
-      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
-    );
-    let worst: { name: string; total: number } | null = null;
-    for (const m of data.members) {
-      if (!m.team_id) continue;
-      if (freeAgentTeamIds.has(m.team_id)) continue;
-      const s = scores.get(m.id);
-      if (!s) continue;
-      if (!worst || s.total < worst.total) worst = { name: m.name, total: s.total };
-    }
-    return worst;
-  }, [data, scores]);
-
-  const podium = useMemo(() => {
-    if (!data) return [] as { name: string; total: number }[];
-    const freeAgentTeamIds = new Set(
-      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
-    );
-    const ranked = data.members
-      .filter((m) => m.team_id && !freeAgentTeamIds.has(m.team_id))
-      .map((m) => ({ name: m.name, total: scores.get(m.id)?.total ?? 0 }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 3);
-    return ranked;
-  }, [data, scores]);
+  const podium = ranked.slice(0, 3);
+  const dogshit = ranked.length ? ranked[ranked.length - 1] : null;
 
 
   return (
