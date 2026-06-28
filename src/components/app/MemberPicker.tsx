@@ -35,8 +35,10 @@ export function useMembersQuery() {
     queryFn: async () => {
       let q = supabase
         .from("members")
-        .select("id, name, avatar_url, team_id, has_password, is_demo, teams(*)")
+        .select("id, name, avatar_url, team_id, has_password, is_demo, is_banned, teams(*)")
         .order("name");
+      // Hide banned members entirely.
+      q = q.eq("is_banned", false);
       // Hide demo members from everyone except the demo user themselves.
       q = me ? q.or(`is_demo.eq.false,id.eq.${me}`) : q.eq("is_demo", false);
       const { data, error } = await q;
@@ -140,7 +142,12 @@ function PasswordPrompt({
       reset();
     } catch (e: any) {
       const msg = String(e.message || e);
-      toast.error(msg.includes("wrong_password") ? "Wrong password" : msg);
+      if (msg.includes("banned:")) {
+        const idx = msg.indexOf("banned:");
+        toast.error(msg.slice(idx + "banned:".length).trim() || "Access removed.");
+      } else {
+        toast.error(msg.includes("wrong_password") ? "Wrong password" : msg);
+      }
       setBusy(false);
     }
   };
@@ -234,34 +241,11 @@ function RenameDialog({
   const session = useSession();
   const me = useMe();
   const { data: members } = useMembersQuery();
-  const { data: teams } = useTeamsQuery();
-  const qc = useQueryClient();
   const current = members?.find((m) => m.id === me) as Member | undefined;
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [teamBusy, setTeamBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const joinTeam = async (teamId: string | null) => {
-    if (!session) return;
-    setTeamBusy(teamId ?? "none");
-    try {
-      const { error } = await supabase.rpc("member_set_team", {
-        _token: session.token,
-        _team_id: teamId,
-      } as never);
-      if (error) throw error;
-      toast.success(teamId ? "Joined team" : "Left team");
-      onRenamed();
-      qc.invalidateQueries({ queryKey: ["members"] });
-      qc.invalidateQueries({ queryKey: ["leaderboard"] });
-    } catch (e: any) {
-      toast.error(String(e.message || e));
-    } finally {
-      setTeamBusy(null);
-    }
-  };
 
   const submit = async () => {
     if (!session) return;
@@ -359,36 +343,6 @@ function RenameDialog({
               placeholder={current?.name}
               onChange={(e) => setName(e.target.value)}
             />
-          </div>
-          <div>
-            <Label>Team</Label>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
-              {teams?.map((t) => {
-                const active = current?.team_id === t.id;
-                return (
-                  <Button
-                    key={t.id}
-                    type="button"
-                    variant={active ? "default" : "secondary"}
-                    size="sm"
-                    className="justify-start"
-                    disabled={teamBusy !== null}
-                    onClick={() => joinTeam(active ? null : t.id)}
-                  >
-                    <span
-                      className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: t.color }}
-                    />
-                    <span className="truncate">{t.name}</span>
-                  </Button>
-                );
-              })}
-            </div>
-            {current?.team_id && (
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Tap your current team to leave it.
-              </p>
-            )}
           </div>
         </div>
         <DialogFooter>

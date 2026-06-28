@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Trophy, Skull, Crown, Medal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Skull, Crown, Medal, Flame } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,11 +15,6 @@ import {
 import { sumTotal, withinTimeBuffer, type Rule } from "@/lib/score";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { PushSettings } from "@/components/app/PushSettings";
 import { Announcements } from "@/components/app/Announcements";
 
@@ -35,8 +30,16 @@ function Leaderboard() {
   const ws = useMemo(() => toISODate(startOfMonth(anchor)), [anchor]);
   const we = useMemo(() => toISODate(endOfMonth(anchor)), [anchor]);
   const daysInMonth = useMemo(() => daysOfMonth(anchor).length, [anchor]);
-  const [openTeams, setOpenTeams] = useState<Record<string, boolean>>({});
   const qc = useQueryClient();
+
+  // Auto-enforce removals on mount (idempotent server-side).
+  useEffect(() => {
+    supabase.rpc("enforce_inactivity_bans" as never).then(() => {
+      qc.invalidateQueries({ queryKey: ["leaderboard"] });
+      qc.invalidateQueries({ queryKey: ["inactivity"] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Realtime: refresh standings whenever any activity changes
   useEffect(() => {
@@ -66,10 +69,13 @@ function Leaderboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard", ws, we],
     queryFn: async () => {
-      const [teams, members, rules, gym, dw, sleep, macros, freeDays, targets, snapshots] =
+      const [members, rules, gym, dw, sleep, macros, freeDays, targets, snapshots] =
         await Promise.all([
-          supabase.from("teams").select("*").order("sort_order"),
-          supabase.from("members").select("id, name, team_id").eq("is_demo", false),
+          supabase
+            .from("members")
+            .select("id, name")
+            .eq("is_demo", false)
+            .eq("is_banned", false),
           supabase.from("scoring_rules").select("*"),
           supabase
             .from("gym_logs")
@@ -104,7 +110,6 @@ function Leaderboard() {
         .gte("date", ws)
         .lte("date", we);
       return {
-        teams: teams.data ?? [],
         members: members.data ?? [],
         rules: (rules.data ?? []) as Rule[],
         gym: gym.data ?? [],
@@ -118,6 +123,20 @@ function Leaderboard() {
       };
     },
   });
+
+  const { data: inactivity } = useQuery({
+    queryKey: ["inactivity"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("members_inactivity_overview" as never);
+      if (error) throw error;
+      return (data ?? []) as { member_id: string; worst_category: string; worst_streak: number }[];
+    },
+  });
+  const streakByMember = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of inactivity ?? []) m.set(r.member_id, Number(r.worst_streak ?? 0));
+    return m;
+  }, [inactivity]);
 
   const scores = useMemo(() => {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
@@ -190,59 +209,18 @@ function Leaderboard() {
     return result;
   }, [data, anchor, daysInMonth]);
 
-  const teamTotals = useMemo(() => {
-    if (!data) return new Map<string, number>();
-    const totals = new Map<string, number>();
-    for (const t of data.teams) totals.set(t.id, 0);
-    for (const m of data.members) {
-      if (!m.team_id) continue;
-      const s = scores.get(m.id);
-      if (!s) continue;
-      totals.set(m.team_id, Number(((totals.get(m.team_id) ?? 0) + s.total).toFixed(2)));
-    }
-    return totals;
+  const ranked = useMemo(() => {
+    if (!data) return [] as { id: string; name: string; total: number; gym: number; deep_work: number; sleep: number; macros: number }[];
+    return data.members
+      .map((m) => {
+        const s = scores.get(m.id) ?? { gym: 0, deep_work: 0, sleep: 0, macros: 0, total: 0 };
+        return { id: m.id, name: m.name, ...s };
+      })
+      .sort((a, b) => b.total - a.total);
   }, [data, scores]);
 
-  const leaderTeamId = useMemo(() => {
-    let max = -1;
-    let id: string | null = null;
-    teamTotals.forEach((v, k) => {
-      if (v > max) {
-        max = v;
-        id = k;
-      }
-    });
-    return id;
-  }, [teamTotals]);
-
-  const dogshit = useMemo(() => {
-    if (!data) return null;
-    const freeAgentTeamIds = new Set(
-      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
-    );
-    let worst: { name: string; total: number } | null = null;
-    for (const m of data.members) {
-      if (!m.team_id) continue;
-      if (freeAgentTeamIds.has(m.team_id)) continue;
-      const s = scores.get(m.id);
-      if (!s) continue;
-      if (!worst || s.total < worst.total) worst = { name: m.name, total: s.total };
-    }
-    return worst;
-  }, [data, scores]);
-
-  const podium = useMemo(() => {
-    if (!data) return [] as { name: string; total: number }[];
-    const freeAgentTeamIds = new Set(
-      data.teams.filter((t: any) => /free\s*agent/i.test(t.name)).map((t: any) => t.id),
-    );
-    const ranked = data.members
-      .filter((m) => m.team_id && !freeAgentTeamIds.has(m.team_id))
-      .map((m) => ({ name: m.name, total: scores.get(m.id)?.total ?? 0 }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 3);
-    return ranked;
-  }, [data, scores]);
+  const podium = ranked.slice(0, 3);
+  const dogshit = ranked.length ? ranked[ranked.length - 1] : null;
 
 
   return (
@@ -360,79 +338,50 @@ function Leaderboard() {
           ))}
         </div>
       ) : (
-        <div className="space-y-3">
-          {data.teams.map((t) => {
-            const teamMembers = data.members.filter((m) => m.team_id === t.id);
-            const total = teamTotals.get(t.id) ?? 0;
-            const isLeader = t.id === leaderTeamId && total > 0;
-            const isOpen = openTeams[t.id] ?? false;
-            return (
-              <Collapsible
-                key={t.id}
-                open={isOpen}
-                onOpenChange={(o) => setOpenTeams((prev) => ({ ...prev, [t.id]: o }))}
-                className={`overflow-hidden rounded-2xl border bg-card ${
-                  isLeader ? "border-primary/60 shadow-[0_0_0_1px_var(--color-primary)]" : "border-border"
-                }`}
-              >
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+            <div className="text-right">#</div>
+            <div></div>
+            <div className="w-9 text-right">Gym</div>
+            <div className="w-9 text-right">DW</div>
+            <div className="w-9 text-right">Sleep</div>
+            <div className="w-9 text-right">Macros</div>
+            <div className="w-10 text-right text-foreground">Total</div>
+          </div>
+          <ul className="divide-y divide-border border-t border-border">
+            {ranked.map((m, i) => {
+              const streak = streakByMember.get(m.id) ?? 0;
+              const hotSeat = streak >= 3;
+              return (
+                <li key={m.id}>
+                  <Link
+                    to="/members/$memberId"
+                    params={{ memberId: m.id }}
+                    className="grid grid-cols-[2rem_1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums transition-colors hover:bg-accent/50"
                   >
-                    <div className="flex items-center gap-2">
-                      {isLeader && <Trophy className="h-4 w-4 text-primary" />}
-                      <h2 className="text-base font-semibold">{t.name}</h2>
-                      <span className="text-xs text-muted-foreground">
-                        {teamMembers.length} {teamMembers.length === 1 ? "member" : "members"}
-                      </span>
+                    <div className="text-right text-muted-foreground">{i + 1}</div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">{m.name}</span>
+                      {hotSeat && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                          <Flame className="h-3 w-3" />
+                          Under hot seat
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-full bg-secondary px-3 py-1 text-sm font-bold tabular-nums">
-                        {total.toFixed(1)}
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${
-                          isOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </div>
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 gap-y-1 px-4 pb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <div></div>
-                    <div className="w-9 text-right">Gym</div>
-                    <div className="w-9 text-right">DW</div>
-                    <div className="w-9 text-right">Sleep</div>
-                    <div className="w-9 text-right">Macros</div>
-                    <div className="w-10 text-right text-foreground">Total</div>
-                  </div>
-                  <ul className="divide-y divide-border border-t border-border">
-                  {teamMembers.map((m) => {
-                    const s = scores.get(m.id) ?? { gym: 0, deep_work: 0, sleep: 0, macros: 0, total: 0 };
-                    return (
-                      <li key={m.id}>
-                        <Link
-                          to="/members/$memberId"
-                          params={{ memberId: m.id }}
-                          className="grid grid-cols-[1fr_repeat(5,auto)] items-center gap-x-2 px-4 py-2.5 text-sm tabular-nums transition-colors hover:bg-accent/50"
-                        >
-                          <div className="truncate font-medium">{m.name}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.gym.toFixed(1)}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.deep_work.toFixed(1)}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.sleep.toFixed(1)}</div>
-                          <div className="w-9 text-right text-muted-foreground">{s.macros.toFixed(1)}</div>
-                          <div className="w-10 text-right font-semibold">{s.total.toFixed(1)}</div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                  </ul>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
+                    <div className="w-9 text-right text-muted-foreground">{m.gym.toFixed(1)}</div>
+                    <div className="w-9 text-right text-muted-foreground">{m.deep_work.toFixed(1)}</div>
+                    <div className="w-9 text-right text-muted-foreground">{m.sleep.toFixed(1)}</div>
+                    <div className="w-9 text-right text-muted-foreground">{m.macros.toFixed(1)}</div>
+                    <div className="w-10 text-right font-semibold">{m.total.toFixed(1)}</div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+            Miss 3 days of gym / sleep / macros / deep work in a row → hot seat. Miss 5 in a row → removed.
+          </p>
         </div>
       )}
     </AppShell>
