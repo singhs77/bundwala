@@ -160,7 +160,7 @@ function Leaderboard() {
         }
         return Number(s.hours ?? 0) >= 7;
       }).length;
-      // Macros: (daysInMonth / 5) pts per logged day, capped at 5
+      // Macros: 0.2 pts per fully-logged day, no cap
       const macrosDates = new Set(
         data.macros
           .filter(
