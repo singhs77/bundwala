@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Skull, Crown, Medal, Flame } from "lucide-react";
+import { ChevronLeft, ChevronRight, Skull, Crown, Medal } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -31,15 +31,6 @@ function Leaderboard() {
   const we = useMemo(() => toISODate(endOfMonth(anchor)), [anchor]);
   const daysInMonth = useMemo(() => daysOfMonth(anchor).length, [anchor]);
   const qc = useQueryClient();
-
-  // Auto-enforce removals on mount (idempotent server-side).
-  useEffect(() => {
-    supabase.rpc("enforce_inactivity_bans" as never).then(() => {
-      qc.invalidateQueries({ queryKey: ["leaderboard"] });
-      qc.invalidateQueries({ queryKey: ["inactivity"] });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Realtime: refresh standings whenever any activity changes
   useEffect(() => {
@@ -123,20 +114,6 @@ function Leaderboard() {
       };
     },
   });
-
-  const { data: inactivity } = useQuery({
-    queryKey: ["inactivity"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("members_inactivity_overview" as never);
-      if (error) throw error;
-      return (data ?? []) as { member_id: string; worst_category: string; worst_streak: number }[];
-    },
-  });
-  const streakByMember = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of inactivity ?? []) m.set(r.member_id, Number(r.worst_streak ?? 0));
-    return m;
-  }, [inactivity]);
 
   const scores = useMemo(() => {
     if (!data) return new Map<string, { gym: number; deep_work: number; sleep: number; macros: number; total: number }>();
@@ -350,8 +327,6 @@ function Leaderboard() {
           </div>
           <ul className="divide-y divide-border border-t border-border">
             {ranked.map((m, i) => {
-              const streak = streakByMember.get(m.id) ?? 0;
-              const hotSeat = streak >= 3;
               return (
                 <li key={m.id}>
                   <Link
@@ -362,12 +337,6 @@ function Leaderboard() {
                     <div className="text-right text-muted-foreground">{i + 1}</div>
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate font-medium">{m.name}</span>
-                      {hotSeat && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-destructive">
-                          <Flame className="h-3 w-3" />
-                          Under hot seat
-                        </span>
-                      )}
                     </div>
                     <div className="w-9 text-right text-muted-foreground">{m.gym.toFixed(1)}</div>
                     <div className="w-9 text-right text-muted-foreground">{m.deep_work.toFixed(1)}</div>
@@ -379,9 +348,6 @@ function Leaderboard() {
               );
             })}
           </ul>
-          <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-            Miss 3 days of gym / sleep / macros / deep work in a row → hot seat. Miss 5 in a row → removed.
-          </p>
         </div>
       )}
     </AppShell>
