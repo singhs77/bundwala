@@ -21,6 +21,7 @@ export function setSession(s: Session) {
   } else {
     window.localStorage.removeItem(KEY_ID);
     window.localStorage.removeItem(KEY_TOKEN);
+    window.localStorage.removeItem("tracker.lastTouch");
   }
   window.dispatchEvent(new Event("tracker:me"));
 }
