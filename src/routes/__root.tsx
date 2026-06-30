@@ -102,13 +102,35 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEffect(() => {
-    const s = getSession();
-    if (!s) return;
-    supabase
-      .rpc("touch_session", { _token: s.token } as never)
-      .then(({ error }) => {
-        if (error) handleRpcError(error);
-      });
+    const TOUCH_KEY = "tracker.lastTouch";
+    const THROTTLE_MS = 6 * 60 * 60 * 1000; // 6 hours
+    const touch = () => {
+      const s = getSession();
+      if (!s) return;
+      try {
+        const last = Number(window.localStorage.getItem(TOUCH_KEY) || 0);
+        if (Date.now() - last < THROTTLE_MS) return;
+        window.localStorage.setItem(TOUCH_KEY, String(Date.now()));
+      } catch {
+        // ignore storage errors
+      }
+      supabase
+        .rpc("touch_session", { _token: s.token } as never)
+        .then(({ error }) => {
+          if (error) handleRpcError(error);
+        });
+    };
+    touch();
+    const onFocus = () => touch();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") touch();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
   return (
     <QueryClientProvider client={queryClient}>
