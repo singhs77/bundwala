@@ -271,20 +271,35 @@ function SleepPage() {
         }}
         renderHistory={(mid) => {
           const rows = logsByMember.get(mid) ?? [];
-          if (!rows.length)
-            return <p className="text-sm text-muted-foreground">No entries this month.</p>;
+          const avg = rows.length
+            ? rows.reduce((sum, l) => sum + (Number(l.hours) || 0), 0) / rows.length
+            : 0;
           return (
-            <ul className="divide-y divide-border">
-              {rows.map((r) => (
-                <li
-                  key={r.id}
-                  className="flex items-center justify-between gap-3 py-2 text-sm"
-                >
-                  <span className="text-muted-foreground">{r.date}</span>
-                  {sleepRow(r, mid)}
-                </li>
-              ))}
-            </ul>
+            <>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  This month
+                </span>
+                <span className="text-xs font-semibold tabular-nums">
+                  Avg {avg.toFixed(1)}h
+                </span>
+              </div>
+              {!rows.length ? (
+                <p className="text-sm text-muted-foreground">No entries this month.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {rows.map((r) => (
+                    <li
+                      key={r.id}
+                      className="flex items-center justify-between gap-3 py-2 text-sm"
+                    >
+                      <span className="text-muted-foreground">{r.date}</span>
+                      {sleepRow(r, mid)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           );
         }}
       />
