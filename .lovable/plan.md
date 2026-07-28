@@ -1,40 +1,35 @@
-## Why people keep getting logged out
+## Goal
 
-This app doesn't actually use OAuth — sign-in is the custom name + password flow that mints a `member_sessions` token stored in `localStorage` (`tracker.token`). Two things in the current setup combine to log people out sooner than expected:
+Let each member set their own sleep target (bedtime + wake time) from the Sleep page, and lock the target for 1 month after any change so people can't game the ±90-min buffer daily.
 
-1. **Sessions only get "touched" once per app load.** `src/routes/__root.tsx` calls `touch_session` exactly once on mount. If a user opens the app, then doesn't come back for 30+ days, the token expires and the next RPC throws `invalid_session`, which `handleRpcError` turns into `clearSession()` + "Session expired — please log back in." On mobile (the main use case), tabs get killed and reopened a lot, so this fires more than you'd expect.
-2. **30-day window is short for a casual daily-log app**, and there is no "refresh on activity" — touching only happens on cold load, not on navigation or successful actions.
+## Changes
 
-## Plan
+### 1. Database
 
-### 1. Lengthen the session window — 1 year, sliding
+- Add `sleep_targets.updated_at timestamptz not null default now()` (nullable-safe backfill to `now()` for existing rows).
+- New RPC `member_set_sleep_target(_token uuid, _sleep time, _wake time)`:
+  - Resolves member from token.
+  - Loads existing row. If it exists and `updated_at > now() - interval '1 month'`, raise `target_locked` with the unlock date encoded (e.g. `target_locked:2026-08-27`).
+  - Otherwise upserts `target_sleep`, `target_wake`, `updated_at = now()`.
+- Add friendly mapping for `target_locked` in `src/lib/rpc.ts` → "You can change your sleep target again on <date>."
 
-Migration:
-- Change `member_sessions.expires_at` default from `now() + interval '30 days'` to `now() + interval '1 year'`.
-- Update `public.touch_session(_token)` to set `expires_at = now() + interval '1 year'` (instead of 30 days).
-- Bulk-extend all currently-valid sessions: `UPDATE member_sessions SET expires_at = now() + interval '1 year' WHERE expires_at > now();` so existing logged-in users immediately get the longer window.
+### 2. UI — `src/routes/sleep.tsx`
 
-### 2. Touch the session more often (sliding refresh)
+Replace the read-only "Your target" card with an editable panel:
 
-In `src/routes/__root.tsx`:
-- Keep the on-mount `touch_session` call.
-- Also call `touch_session` on `window` `focus` and `visibilitychange` → visible, throttled to at most once every 6 hours (tracked via a `localStorage` timestamp `tracker.lastTouch` so it survives tab reloads).
-- This way any time the user opens the app (even just bringing the tab/PWA to the foreground), their 1-year clock resets.
+- Shows current target (or "Not set").
+- Two time inputs (sleep / wake) + Save button.
+- If the target is locked (updated within last month):
+  - Inputs disabled.
+  - Small note: "Locked until <date> — you can change it once per month."
+- If unlocked:
+  - Save calls the new RPC, invalidates `sleep-target` + `sleep-month`, shows toast.
+- Keep the ±90 min buffer explainer.
 
-### 3. Stop spurious sign-outs
-
-In `src/lib/rpc.ts` `handleRpcError`:
-- Only clear the session for `invalid_session` (already the case) — leave as-is, but double-check no other transient code paths trigger it. Network errors, RLS errors, etc. must not log the user out.
-- No behavior change unless we spot another trigger; this is a safety review, not a rewrite.
-
-### What stays the same
-
-- Password reset, `member_set_password`, ban enforcement, and admin "revoke sessions" still wipe `member_sessions` rows — that's intentional and shouldn't change.
-- Demo account behavior is unchanged.
-- No UI changes; nothing visible to users except that they stop getting kicked out.
+No changes to scoring, other members' targets, or the log flow.
 
 ### Technical notes
 
-- Files touched: one new SQL migration, `src/routes/__root.tsx`. No schema beyond column default + function body.
-- `member_sessions` RLS / grants are unchanged; all access still goes through `SECURITY DEFINER` RPCs.
-- Throttle key `tracker.lastTouch` is a millisecond epoch; cleared implicitly when the user signs out (we can also clear it in `clearSession`).
+- Files: 1 migration, `src/lib/rpc.ts`, `src/routes/sleep.tsx`.
+- "1 month" = `interval '1 month'` (calendar month), computed server-side so client clock can't cheat.
+- First-time set (no existing row) is always allowed — the lock only starts after the first save.

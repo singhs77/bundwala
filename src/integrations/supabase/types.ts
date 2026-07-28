@@ -623,16 +623,19 @@ export type Database = {
           member_id: string
           target_sleep: string | null
           target_wake: string | null
+          updated_at: string
         }
         Insert: {
           member_id: string
           target_sleep?: string | null
           target_wake?: string | null
+          updated_at?: string
         }
         Update: {
           member_id?: string
           target_sleep?: string | null
           target_wake?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -853,6 +856,10 @@ export type Database = {
           _new_password: string
         }
         Returns: string
+      }
+      member_set_sleep_target: {
+        Args: { _sleep: string; _token: string; _wake: string }
+        Returns: undefined
       }
       member_set_team: {
         Args: { _team_id: string; _token: string }
