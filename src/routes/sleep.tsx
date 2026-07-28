@@ -64,6 +64,43 @@ function SleepPage() {
     enabled: !!me,
   });
 
+  const [targetSleepInput, setTargetSleepInput] = useState("");
+  const [targetWakeInput, setTargetWakeInput] = useState("");
+  useEffect(() => {
+    setTargetSleepInput(target?.target_sleep?.slice(0, 5) ?? "");
+    setTargetWakeInput(target?.target_wake?.slice(0, 5) ?? "");
+  }, [target]);
+
+  const targetUpdatedAt = (target as any)?.updated_at
+    ? new Date((target as any).updated_at)
+    : null;
+  const unlockDate = targetUpdatedAt
+    ? new Date(targetUpdatedAt.getTime() + 30 * 86400000)
+    : null;
+  const locked = !!(unlockDate && unlockDate.getTime() > Date.now());
+  const unlockLabel = unlockDate
+    ? unlockDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  const saveTarget = useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error("Not signed in");
+      if (!targetSleepInput || !targetWakeInput) throw new Error("Set both sleep and wake times");
+      const { error } = await supabase.rpc("member_set_sleep_target" as any, {
+        _token: session.token,
+        _sleep: targetSleepInput as any,
+        _wake: targetWakeInput as any,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sleep-target"] });
+      qc.invalidateQueries({ queryKey: ["sleep-month"] });
+      toast.success("Sleep target updated");
+    },
+    onError: (e: Error) => toast.error(handleRpcError(e)),
+  });
+
   const { data: today_log } = useQuery({
     queryKey: ["sleep-today", me, selectedDate],
     queryFn: async () => {
@@ -197,17 +234,52 @@ function SleepPage() {
 
   return (
     <AppShell title="Sleep">
-      {target && (
-        <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+      <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Your target</p>
-          <p className="mt-1 text-lg font-semibold">
-            {target.target_sleep?.slice(0, 5)} → {target.target_wake?.slice(0, 5)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            ±90 min buffer — within the window still scores the point.
-          </p>
+          {target ? (
+            <p className="text-sm font-semibold tabular-nums">
+              {target.target_sleep?.slice(0, 5)} → {target.target_wake?.slice(0, 5)}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Not set</p>
+          )}
         </div>
-      )}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="ts">Target sleep</Label>
+            <Input
+              id="ts"
+              type="time"
+              value={targetSleepInput}
+              onChange={(e) => setTargetSleepInput(e.target.value)}
+              disabled={locked}
+            />
+          </div>
+          <div>
+            <Label htmlFor="tw">Target wake</Label>
+            <Input
+              id="tw"
+              type="time"
+              value={targetWakeInput}
+              onChange={(e) => setTargetWakeInput(e.target.value)}
+              disabled={locked}
+            />
+          </div>
+        </div>
+        <Button
+          className="mt-3 w-full"
+          onClick={() => saveTarget.mutate()}
+          disabled={locked || saveTarget.isPending}
+        >
+          {target ? "Update target" : "Set target"}
+        </Button>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {locked
+            ? `Locked until ${unlockLabel} — you can change your target once per month.`
+            : "±90 min buffer — within the window still scores the point. Locks for 1 month after each change."}
+        </p>
+      </div>
 
       <section className="rounded-2xl border border-border bg-card p-4">
         <h2 className="font-semibold">Log sleep</h2>
