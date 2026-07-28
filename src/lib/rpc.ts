@@ -28,6 +28,11 @@ const FRIENDLY: Record<string, string> = {
 
 function extractCode(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? "");
+  if (msg.includes("target_locked")) {
+    const m = msg.match(/target_locked:(\d{4}-\d{2}-\d{2})/);
+    if (m) return `__target_locked__${m[1]}`;
+    return "__target_locked__";
+  }
   for (const code of Object.keys(FRIENDLY)) {
     if (msg.includes(code)) return code;
   }
@@ -37,6 +42,12 @@ function extractCode(err: unknown): string {
 /** Map a raw RPC error to a human-readable string. */
 export function formatRpcError(err: unknown): string {
   const code = extractCode(err);
+  if (code.startsWith("__target_locked__")) {
+    const date = code.slice("__target_locked__".length);
+    return date
+      ? `You can change your sleep target again on ${date}.`
+      : "You can only change your sleep target once per month.";
+  }
   return FRIENDLY[code] ?? code;
 }
 
