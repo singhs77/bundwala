@@ -48,6 +48,7 @@ function Leaderboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "macros_logs" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "deep_work" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "deep_work_bonuses" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sleep_bonuses" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "free_days" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "members" }, refresh)
       .subscribe();
@@ -80,7 +81,7 @@ function Leaderboard() {
             .lte("date", we),
           supabase
             .from("sleep_logs")
-            .select("member_id,date,hours,free_day,sleep_time,wake_time")
+            .select("member_id,date,hours,free_day,sleep_time,wake_time,target_sleep,target_wake")
             .gte("date", ws)
             .lte("date", we),
           supabase
@@ -100,6 +101,11 @@ function Leaderboard() {
         .select("member_id,date,points")
         .gte("date", ws)
         .lte("date", we);
+      const { data: sleepBonusData } = await supabase
+        .from("sleep_bonuses")
+        .select("member_id,date,points")
+        .gte("date", ws)
+        .lte("date", we);
       return {
         members: members.data ?? [],
         rules: (rules.data ?? []) as Rule[],
@@ -111,6 +117,7 @@ function Leaderboard() {
         targets: targets.data ?? [],
         snapshots: snapshots.data ?? [],
         dwBonuses: (dwBonusData ?? []) as { member_id: string; date: string; points: number }[],
+        sleepBonuses: (sleepBonusData ?? []) as { member_id: string; date: string; points: number }[],
       };
     },
   });
@@ -145,17 +152,24 @@ function Leaderboard() {
       const dwBonusSum = data.dwBonuses
         .filter((b) => b.member_id === m.id)
         .reduce((sum, b) => sum + Number(b.points ?? 0), 0);
+      const sleepBonusSum = data.sleepBonuses
+        .filter((b) => b.member_id === m.id)
+        .reduce((sum, b) => sum + Number(b.points ?? 0), 0);
       // Sleep: count days where hit (>=7h) OR was a free day, but only days where they had entry or free day
       const sleepCount = month.filter((d) => {
         if (data.freeDays.includes(d)) return true;
         const s = data.sleep.find((x) => x.member_id === m.id && x.date === d);
         if (!s) return false;
         if (s.free_day) return true;
+        const snapSleep = (s as any).target_sleep as string | null;
+        const snapWake = (s as any).target_wake as string | null;
         const t = data.targets.find((x: any) => x.member_id === m.id);
-        if (t?.target_sleep && t?.target_wake) {
+        const useSleep = snapSleep ?? t?.target_sleep ?? null;
+        const useWake = snapWake ?? t?.target_wake ?? null;
+        if (useSleep && useWake) {
           return (
-            withinTimeBuffer(s.sleep_time, t.target_sleep, 90) &&
-            withinTimeBuffer(s.wake_time, t.target_wake, 90)
+            withinTimeBuffer(s.sleep_time, useSleep, 90) &&
+            withinTimeBuffer(s.wake_time, useWake, 90)
           );
         }
         return Number(s.hours ?? 0) >= 7;
@@ -176,7 +190,7 @@ function Leaderboard() {
       const cat = {
         gym: gymCount * 0.2,
         deep_work: Number((dwCount * 0.3 + dwBonusSum).toFixed(2)),
-        sleep: sleepCount * 0.1,
+        sleep: Number((sleepCount * 0.1 + sleepBonusSum).toFixed(2)),
         macros: macrosDates.size * 0.2,
         total: 0,
       };
