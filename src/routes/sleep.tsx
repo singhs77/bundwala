@@ -125,7 +125,7 @@ function SleepPage() {
           supabase.from("members").select("id,name").eq("is_demo", false),
           supabase
             .from("sleep_logs")
-            .select("id,member_id,date,sleep_time,wake_time,hours,free_day")
+            .select("id,member_id,date,sleep_time,wake_time,hours,free_day,target_sleep,target_wake")
             .gte("date", ms)
             .lte("date", me_)
             .order("date", { ascending: false }),
@@ -194,11 +194,15 @@ function SleepPage() {
     if (!log) return false;
     if (log.free_day) return true;
     if (groupRows?.freeDays.has(log.date)) return true;
+    const snapSleep = (log as any).target_sleep as string | null | undefined;
+    const snapWake = (log as any).target_wake as string | null | undefined;
     const t = targetByMember.get(memberId);
-    if (t?.target_sleep && t?.target_wake) {
+    const useSleep = snapSleep ?? t?.target_sleep ?? null;
+    const useWake = snapWake ?? t?.target_wake ?? null;
+    if (useSleep && useWake) {
       return (
-        withinTimeBuffer(log.sleep_time, t.target_sleep, 90) &&
-        withinTimeBuffer(log.wake_time, t.target_wake, 90)
+        withinTimeBuffer(log.sleep_time, useSleep, 90) &&
+        withinTimeBuffer(log.wake_time, useWake, 90)
       );
     }
     return Number(log.hours ?? 0) >= 7;
