@@ -577,6 +577,41 @@ export type Database = {
         }
         Relationships: []
       }
+      sleep_bonuses: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          member_id: string
+          points: number
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          member_id: string
+          points?: number
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          member_id?: string
+          points?: number
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_bonuses_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sleep_logs: {
         Row: {
           created_at: string
@@ -586,6 +621,8 @@ export type Database = {
           id: string
           member_id: string
           sleep_time: string | null
+          target_sleep: string | null
+          target_wake: string | null
           wake_time: string | null
         }
         Insert: {
@@ -596,6 +633,8 @@ export type Database = {
           id?: string
           member_id: string
           sleep_time?: string | null
+          target_sleep?: string | null
+          target_wake?: string | null
           wake_time?: string | null
         }
         Update: {
@@ -606,6 +645,8 @@ export type Database = {
           id?: string
           member_id?: string
           sleep_time?: string | null
+          target_sleep?: string | null
+          target_wake?: string | null
           wake_time?: string | null
         }
         Relationships: [
