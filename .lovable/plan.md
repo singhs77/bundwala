@@ -1,35 +1,42 @@
 ## Goal
 
-Let each member set their own sleep target (bedtime + wake time) from the Sleep page, and lock the target for 1 month after any change so people can't game the ±90-min buffer daily.
+1. Give Twin GL a one-off +0.4 sleep bonus (like the existing deep-work bonus system).
+2. Make sleep target changes non-retroactive: past days keep the target that was active when they were logged; only future logs use the new target.
 
 ## Changes
 
-### 1. Database
+### 1. Snapshot targets on `sleep_logs`
 
-- Add `sleep_targets.updated_at timestamptz not null default now()` (nullable-safe backfill to `now()` for existing rows).
-- New RPC `member_set_sleep_target(_token uuid, _sleep time, _wake time)`:
-  - Resolves member from token.
-  - Loads existing row. If it exists and `updated_at > now() - interval '1 month'`, raise `target_locked` with the unlock date encoded (e.g. `target_locked:2026-08-27`).
-  - Otherwise upserts `target_sleep`, `target_wake`, `updated_at = now()`.
-- Add friendly mapping for `target_locked` in `src/lib/rpc.ts` → "You can change your sleep target again on <date>."
+- Migration: add `target_sleep time` and `target_wake time` columns to `public.sleep_logs` (nullable).
+- Backfill existing rows with the member's CURRENT `sleep_targets` values so today's scoring stays identical to right now (this "freezes" everyone's history at the current target).
+- Update `log_sleep` RPC to copy the member's current `sleep_targets` values into the row on insert/update. Once a row exists with a snapshot, subsequent edits to that same date keep the original snapshot (only new dates pick up new targets).
 
-### 2. UI — `src/routes/sleep.tsx`
+### 2. Scoring reads the snapshot
 
-Replace the read-only "Your target" card with an editable panel:
+Update all three consumers of `withinTimeBuffer(...)` for sleep to prefer `log.target_sleep/target_wake` over the live `sleep_targets` row, falling back to the live target only when the snapshot is null (legacy):
 
-- Shows current target (or "Not set").
-- Two time inputs (sleep / wake) + Save button.
-- If the target is locked (updated within last month):
-  - Inputs disabled.
-  - Small note: "Locked until <date> — you can change it once per month."
-- If unlocked:
-  - Save calls the new RPC, invalidates `sleep-target` + `sleep-month`, shows toast.
-- Keep the ±90 min buffer explainer.
+- `src/routes/index.tsx` (leaderboard scoring)
+- `src/routes/sleep.tsx` (per-member hit/miss)
+- `src/routes/members.$memberId.tsx` (member profile)
 
-No changes to scoring, other members' targets, or the log flow.
+The live `sleep_targets` row is still used for the "Your target" editor and for the live "will this earn a point" preview while typing.
+
+### 3. Twin GL sleep bonus
+
+Create a new `public.sleep_bonuses` table mirroring `deep_work_bonuses`:
+
+```text
+sleep_bonuses(id, member_id, date, points numeric default 0.1, reason, created_at)
+```
+
+Public read, no public writes (admin-only via migrations), GRANTs on SELECT to anon/authenticated.
+
+Insert one row: Twin GL, today, `points=0.4`, `reason='manual bonus'`.
+
+Add `sleep_bonuses` into the leaderboard sleep total in `src/routes/index.tsx` the same way `deep_work_bonuses` is already summed.
 
 ### Technical notes
 
-- Files: 1 migration, `src/lib/rpc.ts`, `src/routes/sleep.tsx`.
-- "1 month" = `interval '1 month'` (calendar month), computed server-side so client clock can't cheat.
-- First-time set (no existing row) is always allowed — the lock only starts after the first save.
+- 1 migration (schema + backfill + RPC update + table + grants + policies + insert of Twin GL bonus).
+- Files: `src/routes/index.tsx`, `src/routes/sleep.tsx`, `src/routes/members.$memberId.tsx`, plus regenerated types after migration.
+- No UI changes to the sleep editor; the 1-month lock stays as-is.
