@@ -83,7 +83,7 @@ function MemberLogsPage() {
           supabase.from("teams").select("id,name"),
           supabase.from("gym_logs").select("date,status").eq("member_id", memberId).gte("date", ms).lte("date", me_),
           supabase.from("deep_work").select("id,date,topic,minutes,learnings,personal_notes").eq("member_id", memberId).gte("date", ms).lte("date", me_).order("date", { ascending: false }),
-          supabase.from("sleep_logs").select("date,sleep_time,wake_time,hours,free_day").eq("member_id", memberId).gte("date", ms).lte("date", me_).order("date", { ascending: false }),
+          supabase.from("sleep_logs").select("date,sleep_time,wake_time,hours,free_day,target_sleep,target_wake").eq("member_id", memberId).gte("date", ms).lte("date", me_).order("date", { ascending: false }),
           supabase.from("sleep_targets").select("target_sleep,target_wake").eq("member_id", memberId).maybeSingle(),
           supabase.from("macros_logs").select("date,calories,protein,carbs,fat,sugar,water").eq("member_id", memberId).gte("date", ms).lte("date", me_),
           supabase.from("macros_logs").select("date,calories,protein,carbs,fat,sugar,water").eq("member_id", memberId).gte("date", ws).lte("date", we),
@@ -118,8 +118,10 @@ function MemberLogsPage() {
       if (!s) return false;
       if (s.free_day) return true;
       const t = data.target as any;
-      if (t?.target_sleep && t?.target_wake) {
-        return withinTimeBuffer(s.sleep_time, t.target_sleep, 90) && withinTimeBuffer(s.wake_time, t.target_wake, 90);
+      const useSleep = s.target_sleep ?? t?.target_sleep ?? null;
+      const useWake = s.target_wake ?? t?.target_wake ?? null;
+      if (useSleep && useWake) {
+        return withinTimeBuffer(s.sleep_time, useSleep, 90) && withinTimeBuffer(s.wake_time, useWake, 90);
       }
       return Number(s.hours ?? 0) >= 7;
     }).length;
@@ -381,9 +383,11 @@ function MemberLogsPage() {
           <ul className="mt-3 divide-y divide-border">
             {data.sleep.map((s: any) => {
               const t = data.target as any;
-              const onTime = t?.target_sleep && t?.target_wake
-                ? withinTimeBuffer(s.sleep_time, t.target_sleep, 90) &&
-                  withinTimeBuffer(s.wake_time, t.target_wake, 90)
+              const useSleep = s.target_sleep ?? t?.target_sleep ?? null;
+              const useWake = s.target_wake ?? t?.target_wake ?? null;
+              const onTime = useSleep && useWake
+                ? withinTimeBuffer(s.sleep_time, useSleep, 90) &&
+                  withinTimeBuffer(s.wake_time, useWake, 90)
                 : Number(s.hours ?? 0) >= 7;
               return (
                 <li key={s.date} className="flex items-center justify-between gap-2 py-2 text-sm">
