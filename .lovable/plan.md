@@ -1,42 +1,27 @@
 ## Goal
 
-1. Give Twin GL a one-off +0.4 sleep bonus (like the existing deep-work bonus system).
-2. Make sleep target changes non-retroactive: past days keep the target that was active when they were logged; only future logs use the new target.
+Add a new "Sobriety" tab, laid out like the Gym page, where each member does a daily check for weed, liquor and vape. Members can only log today and yesterday.
 
-## Changes
+## How it works
 
-### 1. Snapshot targets on `sleep_logs`
+- Day picker shows just 2 dates (e.g. "October 12th", "October 11th").
+- Three rows: Weed, Liquor, Vape. Each row has two buttons: **Clean** (green) or **Used** (red). You pick one per row.
+- Mini calendar for the current month: a green day means clean on all three, red means used at least one, grey means not logged.
+- "Clean days this month" counter.
+- An "Everyone's sobriety" list (same as Gym): today's status for each person, plus their monthly history when you tap them.
+- The server blocks changes to any date other than today or yesterday.
+- **No points on the standings for now.** We can add scoring later if you want it.
 
-- Migration: add `target_sleep time` and `target_wake time` columns to `public.sleep_logs` (nullable).
-- Backfill existing rows with the member's CURRENT `sleep_targets` values so today's scoring stays identical to right now (this "freezes" everyone's history at the current target).
-- Update `log_sleep` RPC to copy the member's current `sleep_targets` values into the row on insert/update. Once a row exists with a snapshot, subsequent edits to that same date keep the original snapshot (only new dates pick up new targets).
+## Bottom bar
 
-### 2. Scoring reads the snapshot
+Add a 6th tab, "Sober", with a leaf icon, after Macros.
 
-Update all three consumers of `withinTimeBuffer(...)` for sleep to prefer `log.target_sleep/target_wake` over the live `sleep_targets` row, falling back to the live target only when the snapshot is null (legacy):
+## Technical details
 
-- `src/routes/index.tsx` (leaderboard scoring)
-- `src/routes/sleep.tsx` (per-member hit/miss)
-- `src/routes/members.$memberId.tsx` (member profile)
+- Migration: new `sobriety_logs` table (member_id, date, weed bool, liquor bool, vape bool, unique per member+date). Bools are nullable, and true means used. Public read like the other logs, with GRANT SELECT for anon/authenticated. Writes only go through a `log_sobriety(_token, _date, _substance, _used)` SECURITY DEFINER RPC, which checks the session and only allows today or yesterday. Include the audit trigger.
+- New route `src/routes/sobriety.tsx` built on `MemberFeed`, the same way as `gym.tsx`.
+- Update `BottomNav.tsx` and regenerate types.
 
-The live `sleep_targets` row is still used for the "Your target" editor and for the live "will this earn a point" preview while typing.
+## Open question
 
-### 3. Twin GL sleep bonus
-
-Create a new `public.sleep_bonuses` table mirroring `deep_work_bonuses`:
-
-```text
-sleep_bonuses(id, member_id, date, points numeric default 0.1, reason, created_at)
-```
-
-Public read, no public writes (admin-only via migrations), GRANTs on SELECT to anon/authenticated.
-
-Insert one row: Twin GL, today, `points=0.4`, `reason='manual bonus'`.
-
-Add `sleep_bonuses` into the leaderboard sleep total in `src/routes/index.tsx` the same way `deep_work_bonuses` is already summed.
-
-### Technical notes
-
-- 1 migration (schema + backfill + RPC update + table + grants + policies + insert of Twin GL bonus).
-- Files: `src/routes/index.tsx`, `src/routes/sleep.tsx`, `src/routes/members.$memberId.tsx`, plus regenerated types after migration.
-- No UI changes to the sleep editor; the 1-month lock stays as-is.
+Should "Used" vs "Clean" be the choice for each substance (planned above), or do you want one pick per day out of the three?
