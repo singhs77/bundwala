@@ -688,6 +688,44 @@ export type Database = {
           },
         ]
       }
+      sobriety_logs: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          liquor: boolean | null
+          member_id: string
+          vape: boolean | null
+          weed: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          liquor?: boolean | null
+          member_id: string
+          vape?: boolean | null
+          weed?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          liquor?: boolean | null
+          member_id?: string
+          vape?: boolean | null
+          weed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sobriety_logs_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           color: string
@@ -865,6 +903,15 @@ export type Database = {
           _sleep_time: string
           _token: string
           _wake_time: string
+        }
+        Returns: undefined
+      }
+      log_sobriety: {
+        Args: {
+          _date: string
+          _substance: string
+          _token: string
+          _used: boolean
         }
         Returns: undefined
       }
