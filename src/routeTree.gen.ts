@@ -9,33 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SleepRouteImport } from './routes/sleep'
-import { Route as MacrosRouteImport } from './routes/macros'
-import { Route as GymRouteImport } from './routes/gym'
-import { Route as DeepWorkRouteImport } from './routes/deep-work'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as DeepWorkRouteImport } from './routes/deep-work'
+import { Route as GymRouteImport } from './routes/gym'
+import { Route as MacrosRouteImport } from './routes/macros'
+import { Route as SleepRouteImport } from './routes/sleep'
 import { Route as MembersMemberIdRouteImport } from './routes/members.$memberId'
 import { Route as ApiPublicHooksSendRemindersRouteImport } from './routes/api/public/hooks/send-reminders'
 
-const SleepRoute = SleepRouteImport.update({
-  id: '/sleep',
-  path: '/sleep',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MacrosRoute = MacrosRouteImport.update({
-  id: '/macros',
-  path: '/macros',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GymRoute = GymRouteImport.update({
-  id: '/gym',
-  path: '/gym',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DeepWorkRoute = DeepWorkRouteImport.update({
-  id: '/deep-work',
-  path: '/deep-work',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -43,9 +28,24 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DeepWorkRoute = DeepWorkRouteImport.update({
+  id: '/deep-work',
+  path: '/deep-work',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GymRoute = GymRouteImport.update({
+  id: '/gym',
+  path: '/gym',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MacrosRoute = MacrosRouteImport.update({
+  id: '/macros',
+  path: '/macros',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SleepRoute = SleepRouteImport.update({
+  id: '/sleep',
+  path: '/sleep',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MembersMemberIdRoute = MembersMemberIdRouteImport.update({
@@ -137,32 +137,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sleep': {
-      id: '/sleep'
-      path: '/sleep'
-      fullPath: '/sleep'
-      preLoaderRoute: typeof SleepRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/macros': {
-      id: '/macros'
-      path: '/macros'
-      fullPath: '/macros'
-      preLoaderRoute: typeof MacrosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/gym': {
-      id: '/gym'
-      path: '/gym'
-      fullPath: '/gym'
-      preLoaderRoute: typeof GymRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/deep-work': {
-      id: '/deep-work'
-      path: '/deep-work'
-      fullPath: '/deep-work'
-      preLoaderRoute: typeof DeepWorkRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -172,11 +151,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/deep-work': {
+      id: '/deep-work'
+      path: '/deep-work'
+      fullPath: '/deep-work'
+      preLoaderRoute: typeof DeepWorkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gym': {
+      id: '/gym'
+      path: '/gym'
+      fullPath: '/gym'
+      preLoaderRoute: typeof GymRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/macros': {
+      id: '/macros'
+      path: '/macros'
+      fullPath: '/macros'
+      preLoaderRoute: typeof MacrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sleep': {
+      id: '/sleep'
+      path: '/sleep'
+      fullPath: '/sleep'
+      preLoaderRoute: typeof SleepRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members/$memberId': {
