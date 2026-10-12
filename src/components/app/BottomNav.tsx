@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Trophy, Dumbbell, BookOpen, Moon, Apple } from "lucide-react";
+import { Trophy, Dumbbell, BookOpen, Moon, Apple, Leaf } from "lucide-react";
 
 const items = [
   { to: "/", label: "Standings", icon: Trophy },
@@ -7,6 +7,7 @@ const items = [
   { to: "/deep-work", label: "Deep Work", icon: BookOpen },
   { to: "/sleep", label: "Sleep", icon: Moon },
   { to: "/macros", label: "Macros", icon: Apple },
+  { to: "/sobriety", label: "Sober", icon: Leaf },
 ] as const;
 
 export function BottomNav() {

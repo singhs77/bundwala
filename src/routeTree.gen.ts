@@ -15,6 +15,7 @@ import { Route as DeepWorkRouteImport } from './routes/deep-work'
 import { Route as GymRouteImport } from './routes/gym'
 import { Route as MacrosRouteImport } from './routes/macros'
 import { Route as SleepRouteImport } from './routes/sleep'
+import { Route as SobrietyRouteImport } from './routes/sobriety'
 import { Route as MembersMemberIdRouteImport } from './routes/members.$memberId'
 import { Route as ApiPublicHooksSendRemindersRouteImport } from './routes/api/public/hooks/send-reminders'
 
@@ -48,6 +49,11 @@ const SleepRoute = SleepRouteImport.update({
   path: '/sleep',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SobrietyRoute = SobrietyRouteImport.update({
+  id: '/sobriety',
+  path: '/sobriety',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MembersMemberIdRoute = MembersMemberIdRouteImport.update({
   id: '/members/$memberId',
   path: '/members/$memberId',
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/sobriety': typeof SobrietyRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/sobriety': typeof SobrietyRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/gym': typeof GymRoute
   '/macros': typeof MacrosRoute
   '/sleep': typeof SleepRoute
+  '/sobriety': typeof SobrietyRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/api/public/hooks/send-reminders': typeof ApiPublicHooksSendRemindersRoute
 }
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/gym'
     | '/macros'
     | '/sleep'
+    | '/sobriety'
     | '/members/$memberId'
     | '/api/public/hooks/send-reminders'
   fileRoutesByTo: FileRoutesByTo
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/gym'
     | '/macros'
     | '/sleep'
+    | '/sobriety'
     | '/members/$memberId'
     | '/api/public/hooks/send-reminders'
   id:
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/gym'
     | '/macros'
     | '/sleep'
+    | '/sobriety'
     | '/members/$memberId'
     | '/api/public/hooks/send-reminders'
   fileRoutesById: FileRoutesById
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   GymRoute: typeof GymRoute
   MacrosRoute: typeof MacrosRoute
   SleepRoute: typeof SleepRoute
+  SobrietyRoute: typeof SobrietyRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   ApiPublicHooksSendRemindersRoute: typeof ApiPublicHooksSendRemindersRoute
 }
@@ -179,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SleepRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sobriety': {
+      id: '/sobriety'
+      path: '/sobriety'
+      fullPath: '/sobriety'
+      preLoaderRoute: typeof SobrietyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/members/$memberId': {
       id: '/members/$memberId'
       path: '/members/$memberId'
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   GymRoute: GymRoute,
   MacrosRoute: MacrosRoute,
   SleepRoute: SleepRoute,
+  SobrietyRoute: SobrietyRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   ApiPublicHooksSendRemindersRoute: ApiPublicHooksSendRemindersRoute,
 }
